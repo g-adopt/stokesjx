@@ -28,13 +28,15 @@ DOT_RTOL = 1e-12
 # are float64 evaluations of the same function (cause: rounding of expm's Pade).
 PAIR_TOL = 1e-14
 # Agreement of a vmapped batch with single calls of the stand-in: the same float64
-# operations in a different order (cause: vectorisation of the batch axis). The
-# reviewer measured 1.3e-16 on the values.
+# operations in a different order (cause: vectorisation of the batch axis).
+# Measured 1.3e-16 on the values (NOTES/chunks/c1-foundations/
+# impl-review-jax-r2-evidence).
 VMAP_RTOL = 1e-12
 # Agreement of the step-and-inverse pair with elimination without pivoting and the
 # same pair with the LAPACK solve: the same approximant, two float64 solvers of
-# diagonally dominant 6x6 systems (cause: rounding of the two eliminations; the
-# reviewer measured 1.3e-16 on the stand-in value). Max-normalised per matrix.
+# diagonally dominant 6x6 systems (cause: rounding of the two eliminations;
+# measured 1.3e-16 on the stand-in value, NOTES/chunks/c1-foundations/
+# impl-review-jax-r2-evidence). Max-normalised per matrix.
 PAIR_LAPACK_TOL = 1e-13
 # Agreement of solve_elimination with jnp.linalg.solve on column diagonally
 # dominant matrices (cause: rounding; no pivoting is needed for such matrices).

@@ -46,7 +46,10 @@ include = ["stokesjx*"]
 # Inside the quick set, the functions listed in tests/heavy_tests.txt carry the
 # `heavy` marker (tests/conftest.py adds it). The fast tier is
 # `-m "not slow and not heavy"`.
-addopts = "-m 'not slow'"
+# `--dist loadgroup`: under pytest-xdist (`-n 8`) the tests that carry one
+# `xdist_group` mark run on one worker, so that a solve that they share compiles once
+# (tests/test_kernels_oracle.py). Without `-n` the option has no effect.
+addopts = "-m 'not slow' --dist loadgroup"
 # Ceiling on one test. `timeout_func_only` keeps fixture setup outside the
 # budget, because the first JAX compile can be slow on its own.
 timeout = 1800

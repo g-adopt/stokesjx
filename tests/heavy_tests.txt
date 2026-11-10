@@ -3,3 +3,22 @@
 tests/test_reference_legacy.py::test_g1t_transcription_quick
 tests/test_reference_oracle.py::test_g8d_quick
 tests/test_primitives_ad.py::test_standin_gradient_finite_and_vmap
+# Chunk 2 (c2-forward-core): quick tests above about 2 s under `-n 8` (measured on reunion,
+# 2026-11-11, load average 6 to 9). Every quick Taylor case is here.
+tests/test_kernels_ad.py::test_t1_log_eta
+tests/test_kernels_ad.py::test_t2_misfit
+tests/test_kernels_ad.py::test_t3_rho0
+tests/test_kernels_ad.py::test_t4_radius
+tests/test_kernels_ad.py::test_t5_shift_zero_class
+tests/test_kernels_ad.py::test_t6_shift_velocity
+tests/test_kernels_ad.py::test_t7_golden_table
+tests/test_kernels_ad.py::test_t10_scalar_leaves
+tests/test_kernels_ad.py::test_t11a_consistent_core_density
+tests/test_kernels_ad.py::test_t11b_consistent_core_radius
+tests/test_kernels_ad.py::test_pytree_dot_split_core
+tests/test_kernels_ad.py::test_pytree_dot_consistent_core
+tests/test_kernels_ad.py::test_g5_gradient_finite
+tests/test_kernels_ad.py::test_hessian_finite_and_symmetric
+tests/test_kernels_ad.py::test_vmap_equals_single_calls
+tests/test_linalg.py::test_solve_nodes_value
+tests/test_system_boundary.py::test_interval_steps_against_oracle

@@ -114,7 +114,7 @@
   }
  },
  "cases_py_sha256": "5e05422d937998ed5329726503c5ecf9bb137d6d9c3af9f471e9486ffa466574",
- "cases_py_sha256_oracle": "5e05422d937998ed5329726503c5ecf9bb137d6d9c3af9f471e9486ffa466574",
+ "cases_py_sha256_oracle": "2f88892f9c10f50740e53b907d3ed3b57ae9f95fe86ba4d6a159a8747d081b6f",
  "diagnostics": {
   "iso_fsfs_strict": {
    "build": {
@@ -411,6 +411,14 @@
    "npz": "oracle/hager4_full_fsfs_cc.npz",
    "npz_sha256": "a3e686dc72cc4cc441e67261fdbfb0c38bd871ade3f6fdc0687b4126d94d18b9"
   },
+  "hager4_full_fsfs_high": {
+   "cpu_seconds": 3.15,
+   "dps_max": 146,
+   "dps_min": 120,
+   "n_arrays": 10,
+   "npz": "oracle/hager4_full_fsfs_high.npz",
+   "npz_sha256": "2b7f67498c1fdd7e7579ee057ad7f5bb7ffd47a8470f5fc83bb8d64d44ef5ec4"
+  },
   "hager4_full_fsns": {
    "cpu_seconds": 4.04,
    "dps_max": 68,
@@ -587,6 +595,14 @@
    "npz": "oracle/prem_tala_narrow.npz",
    "npz_sha256": "d3e6b24ec0dca1ea4450c209afbabfd7566e6e241bf4c213d6f700a3476133a8"
   },
+  "rough8_full_fsfs": {
+   "cpu_seconds": 13.12,
+   "dps_max": 250,
+   "dps_min": 250,
+   "n_arrays": 28,
+   "npz": "oracle/rough8_full_fsfs.npz",
+   "npz_sha256": "d8278b741e9b3533bf0c8a38045a336cf7f5ec26f9a557c3104daa47f788235c"
+  },
   "smooth_conv": {
    "cpu_seconds": 19.43,
    "dps_max": 60,
@@ -594,6 +610,22 @@
    "n_arrays": 72,
    "npz": "oracle/smooth_conv.npz",
    "npz_sha256": "f7b76e87de65f0ef8e79241e7b0a8fb42bef674770e00b3748062ae7568237a8"
+  },
+  "smooth_incomp_fsfs": {
+   "cpu_seconds": 2.85,
+   "dps_max": 94,
+   "dps_min": 60,
+   "n_arrays": 36,
+   "npz": "oracle/smooth_incomp_fsfs.npz",
+   "npz_sha256": "07b235f730259664da527599372788626e436160da84c7cfb8c48bed69b8c429"
+  },
+  "stifflid_full_fsfs": {
+   "cpu_seconds": 4.52,
+   "dps_max": 94,
+   "dps_min": 60,
+   "n_arrays": 28,
+   "npz": "oracle/stifflid_full_fsfs.npz",
+   "npz_sha256": "cd9e56a0edf1bc96fa2d01da0b9f8f8674fda6bda88d063093cb5f61ac1c544b"
   },
   "uniform_cc_full_fsfs": {
    "cpu_seconds": 3.46,
@@ -603,6 +635,14 @@
    "npz": "oracle/uniform_cc_full_fsfs.npz",
    "npz_sha256": "f392629e6ef5c2f25f4d47adbb1155043141a07272225db5e061c71e2370d1fb"
   },
+  "wide10_full_fsfs": {
+   "cpu_seconds": 4.52,
+   "dps_max": 94,
+   "dps_min": 60,
+   "n_arrays": 28,
+   "npz": "oracle/wide10_full_fsfs.npz",
+   "npz_sha256": "79ed889b0915bd808171fb25f337c758739f615b174a9564b292676346125cce"
+  },
   "wide5_full_fsfs": {
    "cpu_seconds": 4.41,
    "dps_max": 94,
@@ -610,9 +650,17 @@
    "n_arrays": 20,
    "npz": "oracle/wide5_full_fsfs.npz",
    "npz_sha256": "ac6f4c68818a699f9f356444295919de409937d608172bedc4eb0699256ca461"
+  },
+  "wide5_full_fsfs_high": {
+   "cpu_seconds": 3.16,
+   "dps_max": 146,
+   "dps_min": 120,
+   "n_arrays": 10,
+   "npz": "oracle/wide5_full_fsfs_high.npz",
+   "npz_sha256": "017fd284bf12baf35427ad36e20389e9d0ca36ddee58edb5f64abc809c446607"
   }
  },
- "reference_mpmath_py_sha256": "c8dc835a36b4680c2e1995f397951e6a91b54dc548b59246312caf4b3ef9af2b",
+ "reference_mpmath_py_sha256": "8a7f0de51288ea263ca4fce0ca49e45f96c0a3aa8c13c76688b80258cc3a8c22",
  "source": {
   "path": "~/Workplace/geoid_semianl/CODE-A",
   "sha256": {

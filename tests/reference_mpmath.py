@@ -1361,11 +1361,14 @@ def transcription_kernels(table: NodeTable, bdry: int, bdry_bot: int, kappaindex
 
 
 def _unit_kernels(args):
-    """Worker: kernels of one (variant, degree, frame) unit. Returns a flat dict."""
-    key, table, physics, disc, l, frame, sources = args
+    """Worker: kernels of one (variant, degree, frame) unit. Returns a flat dict.
+
+    The last element of the unit is the working precision of the variant
+    (``OracleVariant.dps``; None: ``required_dps``)."""
+    key, table, physics, disc, l, frame, sources, dps = args
     t0 = time.time()
     ph = physics if frame is None else replace(physics, degree_one=frame)
-    k = kernels(table, ph, disc, (l,), sources=sources)
+    k = kernels(table, ph, disc, (l,), sources=sources, dps=dps)
     flat = {}
     for name, arr in k.items():
         if name == "degree_one":
@@ -1450,7 +1453,7 @@ def main(argv=None) -> None:
                         frames = list(v.l1_frames)
                     for fr in frames:
                         key = (case.name, f"{v.label}/l{l}/{fr or 'raw'}")
-                        units.append((key, v.table, v.physics, v.disc, l, fr, v.sources))
+                        units.append((key, v.table, v.physics, v.disc, l, fr, v.sources, v.dps))
                 if 1 in case.degrees and v.store_null:
                     nulls.append(((case.name, f"{v.label}/l1/null"), v.table, v.physics, v.disc))
             owners[case.name] = case
@@ -1461,12 +1464,12 @@ def main(argv=None) -> None:
             table = cases.golden_table(run)
             physics, disc = legacy_setup(spec["bdry"], spec["bdry_bot"], spec["kappaindex"])
             for l in cases.LEGACY_DEGREES:
-                units.append(((f"legacy_{run}", f"l{l}"), table, physics, disc, l, None, None))
+                units.append(((f"legacy_{run}", f"l{l}"), table, physics, disc, l, None, None, None))
     if a.ishan:
         table = cases.ishan_table(Path(a.ishan))
         physics, disc = legacy_setup(1, 1, 0)
         for l in cases.ISHAN_DEGREES:
-            units.append((("legacy_ishan257", f"l{l}"), table, physics, disc, l, None, None))
+            units.append((("legacy_ishan257", f"l{l}"), table, physics, disc, l, None, None, None))
     # Longest units first, so that the pool is not left waiting on one long unit.
     units.sort(key=lambda u: -(u[4] + 0.02 * u[1].n_nodes * (1 + u[4] / 30)))
     results = {}

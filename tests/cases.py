@@ -135,6 +135,15 @@ TEST_4_ISHAN_LAYERS = HAGER4_LAYERS
 #: (min_visc_asth) to 250 km, 1e21 to 670 km, 1e22 below.
 WIDE5_LAYERS = ((70, "1e4"), (250, "0.1"), (670, "100"), (None, "1000"))
 
+#: Stiff lid (T_stiff_lid): 1e27 Pa s above 70 km on a 1e20 Pa s mantle, seven
+#: decades. The pairs at 250 and 670 km carry no viscosity jump; they keep the node
+#: structure of T_wide5 and T_wide10.
+STIFF_LID_LAYERS = ((70, "1e8"), (250, "10"), (670, "10"), (None, "10"))
+
+#: Ten decades (T_wide10): 1e26 Pa s above 70 km, 1e16 to 250 km, 1e21 to 670 km,
+#: 1e23 below.
+WIDE10_LAYERS = ((70, "1e7"), (250, "1e-3"), (670, "100"), (None, "1e4"))
+
 
 def layered_eta_rel(radius: str, layers, side: int = 0) -> str:
     """eta_rel of a node in a layered profile.
@@ -467,7 +476,7 @@ def _rho_layers(n: _Node) -> str:
 def t_hager(reduced=False, eta_layers=HAGER4_LAYERS, outer_density="0", core="split"):
     """T_hager: LEBEDEV radii and rho0, viscosity pairs at 100, 400 and 670 km depth
     (rho0 interpolated, no density jump), hager4 viscosities, rho_c = 9900. 135 nodes
-    (21 reduced). ``core``: "split" (PREM core mass) or "consistent"."""
+    (23 reduced, 3 pairs). ``core``: "split" (PREM core mass) or "consistent"."""
     nodes = _with_pairs(LEBEDEV_RADIUS, (100, 400, 670))
     nodes = _reduce(nodes) if reduced else nodes
     return _table(nodes, _rho_lebedev, eta_layers, RHO_C,
@@ -477,7 +486,8 @@ def t_hager(reduced=False, eta_layers=HAGER4_LAYERS, outer_density="0", core="sp
 def t_prem(reduced=False, narrow_width_m: str | None = None):
     """T_prem: LEBEDEV radii with pairs at 100, 220, 400 and 670 km, PREM mantle
     density (density jumps at the 220, 400 and 670 km pairs), hager4 viscosities,
-    rho_c the PREM outer-core value at r_c, PREM core mass. 137 nodes (23 reduced).
+    rho_c the PREM outer-core value at r_c, PREM core mass. 137 nodes (25 reduced,
+    4 pairs).
 
     ``narrow_width_m`` replaces the 670 km pair by an interval of that width: the
     lower node moves down to ``r_670 - w`` and keeps the lower-mantle polynomial
@@ -504,6 +514,99 @@ def t_wide5():
     five decades (1e23, 1e18, 1e21, 1e22 Pa s), rho_c = 9900, PREM core mass."""
     nodes = _with_pairs(LEBEDEV_RADIUS, (70, 250, 670))
     return _table(nodes, _rho_lebedev, WIDE5_LAYERS, RHO_C, PREM_CORE_MASS)
+
+
+def t_stiff_lid():
+    """T_stiff_lid: LEBEDEV radii and rho0, pairs at 70, 250 and 670 km depth (rho0
+    interpolated), 1e27 Pa s above 70 km on a 1e20 Pa s mantle (``STIFF_LID_LAYERS``,
+    seven decades), rho_c = 9900, PREM core mass. 135 nodes.
+
+    Purpose: the only stored case with ``eta_max / eta_geo`` above 1e6. At ``l = 1``
+    (CM) a viscosity scale of the solver below the largest viscosity loses digits here:
+    with the geometric mean the velocity kernel had 1.7e-10 under XLA (2.0e-11 in
+    numpy), with the largest viscosity the worst kernel 1.1e-12 (1.9e-12 in numpy, CMB
+    topography); at ``l`` in {2, 10, 50, 100} the two rules gave 3.4e-13 and 3.0e-13, so
+    the separation is at ``l = 1`` (D1 of the chunk 2 plan, measurement 4)."""
+    nodes = _with_pairs(LEBEDEV_RADIUS, (70, 250, 670))
+    return _table(nodes, _rho_lebedev, STIFF_LID_LAYERS, RHO_C, PREM_CORE_MASS)
+
+
+def t_wide10():
+    """T_wide10: as T_stiff_lid with ``WIDE10_LAYERS`` (1e26, 1e16, 1e21, 1e23 Pa s from
+    the top, ten decades). 135 nodes."""
+    nodes = _with_pairs(LEBEDEV_RADIUS, (70, 250, 670))
+    return _table(nodes, _rho_lebedev, WIDE10_LAYERS, RHO_C, PREM_CORE_MASS)
+
+
+#: Viscosity of T_rough8 in Pa s at the 129 LEBEDEV nodes, CMB first: an independent
+#: log-uniform value at every node, ``log10 eta = 21 + 8 (u - 0.5)``, eight decades
+#: (1.8e17 to 9.8e24 Pa s), largest neighbour ratio 1.0e7. Written once from the
+#: generator of NOTES/chunks/c2-forward-core/plan-evidence/r2/rough8_case.py
+#: (``numpy.random.default_rng(108)``, ``u = rng.random(129)``,
+#: ``repr(float(10 ** x))``), so that the table does not depend on the random stream of
+#: a future NumPy.
+ROUGH8_ETA = (
+    '7.046128167368804e+23', '1.143408041258189e+22', '8.77494606321988e+17', '6.3835386087444775e+19',
+    '8.334338270239834e+18', '4.042817082582799e+17', '6.483121202827946e+20', '1.4138474039970399e+24',
+    '3.3892798803373805e+20', '8.828048019322719e+21', '1.8269516699534565e+21', '2.742950147397344e+21',
+    '1.9067686898740458e+20', '9.512345166545254e+17', '9.83081216756065e+24', '3.155660344892831e+18',
+    '5.795540196612637e+19', '6.06746698749937e+18', '4.637157348490234e+22', '6.267251494645022e+23',
+    '3.712725170017855e+17', '6.382183587569013e+21', '6.70108987580437e+17', '1.658481281289755e+24',
+    '9.104260377460785e+19', '1.0585888558571932e+23', '1.3059857389162636e+22', '1.2884080134777956e+24',
+    '1.784652481459431e+21', '2.3512671261049725e+19', '3.4644414140011555e+23', '6.50002260710214e+19',
+    '8.532259135220589e+19', '1.4890081419849797e+18', '6.75094538888959e+18', '7.312144081725733e+19',
+    '2.938101317541048e+24', '3.0763140030633766e+24', '7.391934554282557e+19', '7.866307686429294e+17',
+    '1.1539538203662422e+19', '9.611300430151183e+21', '3.3768672034101485e+17', '2.1164689365471716e+21',
+    '3.618704984491077e+20', '5.447169137051987e+21', '1.0333471208870038e+18', '3.1606250208986395e+24',
+    '2.2324342013132619e+24', '9.213169645775416e+17', '2.63053843876754e+24', '2.6198590662598076e+20',
+    '5.938992751093183e+17', '3.952655600188563e+23', '2.3059346386866634e+22', '2.000268590581955e+19',
+    '4.961891887965839e+17', '9.17409693052809e+19', '8.849910784239556e+17', '3.131495307788968e+22',
+    '1.1727877263117418e+22', '3.081278320937556e+21', '3.044584372471626e+19', '2.894878636574595e+19',
+    '5.8407883350791225e+19', '1.2838856613380037e+19', '5.819737442516136e+17', '2.6542640527413933e+20',
+    '1.7905315289939053e+17', '6.151169925885079e+20', '1.106316509496618e+20', '3.768051331667382e+23',
+    '2.691809682686623e+24', '1.6128632877879052e+22', '1.4968658072287773e+21', '4.17357473540715e+17',
+    '7.338625684185136e+20', '9.000277239693044e+18', '7.730386572421821e+17', '7.336777668592972e+21',
+    '2.814647112991429e+19', '2.706415682488745e+24', '3.3579841018301126e+17', '3.8120399344625616e+21',
+    '2.4338869667148966e+22', '8.58304605129855e+21', '3.1368091876417927e+24', '8.921296901889938e+24',
+    '3.5047070670529688e+19', '2.0952698912120742e+18', '1.174819304606746e+22', '2.626553612935363e+21',
+    '1.6077654895690632e+21', '6.3377472125351034e+22', '5.093278213034374e+18', '1.7909368229852398e+20',
+    '1.9915669604770023e+21', '3.739173227188639e+21', '1.2230166873792925e+24', '9.728466534508388e+22',
+    '1.152558992830967e+19', '1.7747609490632653e+21', '5.188978821580355e+22', '5.00710118348218e+24',
+    '1.3606273316841237e+23', '1.9606166904239156e+22', '5.88661982177293e+23', '3.1515942471893325e+18',
+    '1.0240844424227308e+21', '2.2998227036649987e+17', '1.2991982079607776e+22', '3.732150667448239e+20',
+    '2.1357199749760696e+18', '2.7373847862939406e+21', '2.6121263805751034e+20', '3.8260747811453685e+20',
+    '1.3061100040023257e+22', '1.6362450143192654e+19', '4.2188435195796605e+21', '9.593738837016893e+22',
+    '3.774498240720974e+24', '2.3707042046937057e+18', '4.5484599440877307e+18', '1.7560971020708335e+21',
+    '3.4941925898310543e+18', '7.091233681885769e+21', '1.121077721475007e+24', '4.4004292232968326e+20',
+    '1.467804696202435e+21',
+)
+assert len(ROUGH8_ETA) == LEBEDEV_NODES
+
+#: Oracle precision of T_rough8 in decimal digits. On this table the default precision
+#: (``required_dps``: 60 to 94 digits) is wrong at every stored degree above 2 without
+#: an exception: max-normalised against 250 digits 3.3e-36 (l = 2), 3.3e-16 (l = 10),
+#: 2.8e+4 (l = 50), 9.7e-7 (l = 100), and at l = 1 the singularity check raises
+#: (ratio 1.26e-23). At 250 digits the oracle agrees with 320 digits to 2.4e-232
+#: (l = 1) to 9.9e-163 (l = 100) (NOTES/chunks/c2-forward-core/plan-review-r3-evidence/
+#: r3_chunk1_tests.out, r3_g4_dps250.out). Cause: the oracle carries the three CMB
+#: solutions to the surface in one product, and on a rough table they arrive nearly
+#: parallel. Every live oracle call on T_rough8 passes ``dps=ROUGH8_DPS``.
+ROUGH8_DPS = 250
+
+
+def t_rough8():
+    """T_rough8: LEBEDEV radii and rho0, no pairs, rho_c = 9900, PREM core mass, and an
+    independent viscosity at every node (``ROUGH8_ETA``, eight decades around
+    1e21 Pa s, neighbour ratios up to 1.0e7). 129 nodes.
+
+    Purpose: the only stored case where neighbouring nodes have very different
+    viscosities, which is what a per-node control of a sampler produces (review r2 of
+    the chunk 2 plan, other issue 2). Precision rule: every live oracle call on this
+    table passes ``dps=ROUGH8_DPS``, because at the default precision the oracle returns
+    wrong numbers at ``l >= 2`` without an exception."""
+    from reference_mpmath import NodeTable
+    return NodeTable(radius=LEBEDEV_RADIUS, rho0=LEBEDEV_RHO0, eta=ROUGH8_ETA,
+                     core_density=RHO_C, core_mass=PREM_CORE_MASS)
 
 
 def t_layers(reduced=False):
@@ -577,6 +680,9 @@ class OracleVariant:
     #: Source nodes to store (None: every node). smooth_conv keeps the 65 nodes
     #: common to all four refinements, which is what its convergence study needs.
     sources: tuple | None = None
+    #: Oracle precision in decimal digits (None: ``required_dps`` per degree). Every
+    #: live oracle call on this variant passes it (``ROUGH8_DPS`` for T_rough8).
+    dps: int | None = None
 
 
 @dataclass(frozen=True)
@@ -600,12 +706,12 @@ def _l1_frames(table, physics, store_raw=True):
 
 
 def _variant(label, table, physics=None, disc=None, l1=True, store_raw=True, store_null=False,
-             sources=None):
+             sources=None, dps=None):
     from reference_mpmath import Physics, Discretisation
     physics = physics or Physics()
     disc = disc or Discretisation()
     return OracleVariant(label, table, physics, disc,
-                         _l1_frames(table, physics, store_raw) if l1 else (), store_null, sources)
+                         _l1_frames(table, physics, store_raw) if l1 else (), store_null, sources, dps)
 
 
 def build_oracle_cases() -> tuple[OracleCase, ...]:
@@ -674,6 +780,22 @@ def build_oracle_cases() -> tuple[OracleCase, ...]:
                             tuple(_variant(f"N_{n}", t_smooth(n), tala, sources=tuple(range(0, n + 1, n // 64)))
                                   for n in (64, 128, 256, 512)),
                             "discretisation error, diagnostic"))
+    # Chunk 2 (c2-forward-core): degrees above 100, high viscosity contrast, a rough
+    # viscosity, and the interval mean of a smooth viscosity in the default path.
+    cases.append(OracleCase("hager4_full_fsfs_high", (150, 200), (_variant("base", th, l1=False),),
+                            "degree table above l = 100 (G2 of chunk 2)"))
+    cases.append(OracleCase("wide5_full_fsfs_high", (150, 200), (_variant("base", t_wide5(), l1=False),),
+                            "degree table above l = 100 (G2 of chunk 2)"))
+    cases.append(OracleCase("stifflid_full_fsfs", (1, 2, 10, 50, 100),
+                            (_variant("base", t_stiff_lid(), store_raw=False),),
+                            "seven decades in a stiff lid; separates the viscosity-scale rules at l = 1"))
+    cases.append(OracleCase("wide10_full_fsfs", (1, 2, 10, 50, 100),
+                            (_variant("base", t_wide10(), store_raw=False),), "ten decades of viscosity"))
+    cases.append(OracleCase("rough8_full_fsfs", (1, 2, 10, 50, 100),
+                            (_variant("base", t_rough8(), store_raw=False, dps=ROUGH8_DPS),),
+                            "an independent viscosity at every node over eight decades"))
+    cases.append(OracleCase("smooth_incomp_fsfs", (1, 2, 10, 30, 100), (_variant("base", t_smooth(64)),),
+                            "interval mean of a smooth viscosity, incompressible, default flags"))
     del tu
     return tuple(cases)
 

@@ -59,6 +59,23 @@ RAW_IMBALANCE_TOL = 1e-50
 # first_order.out). 1.8 separates the two rules with
 # a margin of about 0.2.
 SMOOTH_MIN_ORDER = 1.8
+# Lower limit of the stored degree-1 ratio (scaled singular-value ratio of the 3x3
+# degree-1 system that the oracle solves) for every stored l = 1 case.
+DEGREE_ONE_RATIO_MIN = 1e-15
+# The same limit for rough8_full_fsfs only. The stored ratio is the smallest over the
+# largest singular value of the three surface conditions applied to the three CMB
+# solutions, which the oracle carries to the surface in one product (rows scaled to a
+# largest entry of one). On the rough eight-decade table these three solutions arrive
+# nearly parallel: measured 1.26e-23 (2.65e-19 after alternating row and column
+# scaling; hager4: 1.97e-3 and 4.3e-2), the same at 250 and 320 digits
+# (NOTES/chunks/c2-forward-core/plan-review-r3-evidence/r3_ratio_cause.out,
+# plan-evidence/r3/ratio_rough8.out). It is a property of the oracle's method on this
+# table, and it is why the case needs 250 digits (cases.ROUGH8_DPS); the oracle's own
+# singularity limit at 250 digits is 1e-83. The degree-1 problem itself is well posed:
+# the two-sweep solver agrees with the 250-digit oracle to about 1e-14 at l = 1. The
+# limit 1e-30 fails if a change of the table or of the oracle makes the system another
+# seven decades more singular. Logged in NOTES/TOLERANCES.md.
+RATIO_MIN_ROUGH = 1e-30
 
 # ---- helpers ----
 
@@ -165,12 +182,12 @@ def test_g2_full(l):
 # --------------------------------------------------------------------------
 
 
-def _g4(table, physics, degrees):
+def _g4(table, physics, degrees, dps=None):
     worst = mp.mpf(0)
     for l in degrees:
         ph = replace(physics, degree_one="raw") if l == 1 else physics
-        a = mpk(table, ph, Disc(potential_form="local"), (l,))
-        b = mpk(table, ph, Disc(potential_form="global"), (l,))
+        a = mpk(table, ph, Disc(potential_form="local"), (l,), dps=dps)
+        b = mpk(table, ph, Disc(potential_form="global"), (l,), dps=dps)
         worst = max(worst, compare_kernels(a, b))
     return worst
 
@@ -197,7 +214,7 @@ def test_g4_full(case):
             degrees.append(1)
         if degrees:
             ph = v.physics
-            assert _g4(v.table, ph, degrees) <= EXACT_TOL, v.label
+            assert _g4(v.table, ph, degrees, dps=v.dps) <= EXACT_TOL, v.label
 
 
 # --------------------------------------------------------------------------
@@ -844,7 +861,7 @@ def _stored_vs_live(case_name, degrees, load_oracle, labels=None):
             frames = v.l1_frames if l == 1 else (None,)
             for fr in frames:
                 ph = v.physics if fr is None else replace(v.physics, degree_one=fr)
-                k = ro.kernels(v.table, ph, v.disc, (l,), sources=v.sources)
+                k = ro.kernels(v.table, ph, v.disc, (l,), sources=v.sources, dps=v.dps)
                 pre = f"{v.label}/l{l}/{fr or 'raw'}/"
                 for o in ro.SI_OUTPUTS:
                     ref = O[pre + o]
@@ -885,7 +902,8 @@ def test_degree_one_stored_records(load_oracle):
                 pre = f"{v.label}/l1/{fr}/"
                 assert str(O[pre + "degree_one_frame"]) == fr
                 assert np.all(np.isfinite(O[pre + "degree_one_imbalance"]))
-                assert O[pre + "degree_one_ratio"] > 1e-15
+                ratio_min = RATIO_MIN_ROUGH if case.name == "rough8_full_fsfs" else DEGREE_ONE_RATIO_MIN
+                assert O[pre + "degree_one_ratio"] > ratio_min, (case.name, v.label)
                 if fr == "raw":
                     # The raw frame solves the full system: no imbalance beyond the
                     # residual of the 60-digit solve.

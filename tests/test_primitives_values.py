@@ -29,10 +29,15 @@ import cases  # noqa: E402
 import reference_mpmath as ro  # noqa: E402
 
 # Agreement of the float64 candidate step with the oracle step rounded to float64,
-# max-normalised in balanced coordinates. The reviewer measured at most 2.5e-14 on
-# the full hager4, PREM TALA and wide5 tables up to l = 100 (cause: rounding of the
-# Pade approximant and of its squarings, which grows with the squaring count, two
-# at l = 100). A sign error or a wrong entry of A or K gives an error of order 1.
+# max-normalised in balanced coordinates. Measured at most 2.5e-14 on the full
+# hager4, PREM TALA and wide5 tables up to l = 100 (NOTES/chunks/c1-foundations/
+# impl-review-physics-r3-evidence/chk_steps.out). Cause: the width
+# h = log(r_i / r_(i-1)) of this test is computed from a ratio close to one, so it
+# has a relative rounding error of about 2.2e-16 / h (2.4e-14 on 129 nodes), and the
+# step error is that number times the norm of the exponent; the Pade approximant and
+# its squarings add 1e-15 to 4e-15. The package computes the width by log1p
+# (stokesjx.system.interval_widths). A sign error or a wrong entry of A or K gives an
+# error of order 1.
 STEP_ORACLE_TOL = 1e-13
 
 # Tables with jump pairs: the reduced hager4 table (incompressible, split core)

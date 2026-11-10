@@ -317,8 +317,8 @@ def timings(sizes, one_thread: bool = False) -> dict:
 
 # Composed stand-ins of part 4: key, method, orthonormalisation, product layout of
 # the Pade stage, solver of the Pade denominators. The first entry is the budget
-# stand-in of NOTES/CONVENTIONS.md section 7; ``pade6_gs`` is the budget stand-in
-# of the run 2026-11-11T02:33:44.
+# stand-in of NOTES/CONVENTIONS.md section 7; ``pade6_gs`` is the LAPACK comparison
+# form (Pade (6, 6), two squarings, LAPACK solve of the denominators).
 STANDINS = (("standin_pade_ge_gs", "pade", "gs", "batch_last", "elimination"),
             ("standin_pade_ge_plain_gs", "pade", "gs", "batch_last", "elimination_plain"),
             ("standin_pade6_gs", "pade6", "gs", "batch_last", "lapack"),

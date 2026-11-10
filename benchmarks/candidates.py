@@ -493,7 +493,7 @@ def taylor_squarings(norm_bound: float, terms: int = 12, tol: float = 1e-17) -> 
 # 0.999 x 0.783, lmax up to 200) is 3.3e-15. Order 7 costs the same four products
 # as order 6 (``pade_product_count``) and has the larger threshold 0.950 at the
 # unit roundoff, so ``pade_plan`` never selects order 6; order 6 stays for the
-# comparison with the earlier budget stand-in.
+# LAPACK comparison form ``pade6_gs`` of the benchmark.
 PADE_THETA = {6: 0.783, 7: 0.950, 9: 2.098, 13: 5.37}
 
 # Limit of the scalar numerator N_m(x) for the elimination solver: both Pade
@@ -542,7 +542,8 @@ def pade_squarings(norm_bound: float, order: int = 6, solver: str = "elimination
     theta = PADE_THETA[order]
     s = max(0, math.ceil(math.log2(max(norm_bound, 1e-300) / theta)))
     if solver != "lapack":
-        # Each squaring halves x; N_m decreases with x, so the loop ends.
+        # N_m increases with x, and each squaring halves x, so the margin grows
+        # with s and the loop ends.
         while pade_denominator_margin(order, norm_bound / 2.0 ** s) <= 0.0:
             s += 1
         if not pade_denominator_margin(order, norm_bound / 2.0 ** s) > 0.0:
@@ -813,8 +814,8 @@ def make_standin(lmax: int, n_intervals: int, h_max: float, *, method: str = "pa
         "pade" (default, the budget candidate: order and squaring count from
         ``pade_plan``, order 7 with one squaring at both benchmark sizes),
         "pade6" (Pade (6, 6) with the count of ``pade_squarings``; with
-        ``solver="lapack"`` this is the budget stand-in of the run
-        2026-11-11T02:33:44) or "taylor" (Taylor-12).
+        ``solver="lapack"`` this is the LAPACK comparison form ``pade6_gs``) or
+        "taylor" (Taylor-12).
     ortho
         "gs" (Gram-Schmidt, default) or "qr" (LAPACK).
     layout
