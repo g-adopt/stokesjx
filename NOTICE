@@ -1,0 +1,26 @@
+stokesjx
+Copyright 2026 Siavash Ghelichkhan.
+
+This product includes software derived from CODE-A, a Fortran propagator-matrix
+code for the instantaneous geoid and dynamic topography of a viscous mantle. The
+method of CODE-A is described in:
+
+  Corrieu, V., Thoraval, C. and Ricard, Y. (1995). Mantle dynamics and geoid
+  Green functions. Geophysical Journal International, 120, 516-523.
+
+  Hager, B. H. and Clayton, R. W. (1989). Constraints on the structure of mantle
+  convection using seismic observations, flow models, and the geoid. In Mantle
+  Convection: Plate Tectonics and Global Dynamics, ed. W. R. Peltier, Gordon and
+  Breach, 657-763.
+
+The Fortran itself, with its quad-precision LINPACK routines by John Burkardt
+(LGPL), is not distributed with this product.
+
+Parts of this product are ported from lovejx (Siavash Ghelichkhan, Jerry X.
+Mitrovica, William Scott and Mark Hoggard; Apache License, Version 2.0): the
+layer parameterisation of the controls, the integration of gravity from the
+density profile, the pattern of the unit scales, the spherical-harmonic
+conventions and the Taylor-test policy of the test suite.
+
+Anyone who redistributes this software, in source or in binary form, must keep
+this file with it, as Section 4(d) of the Apache License, Version 2.0 requires.

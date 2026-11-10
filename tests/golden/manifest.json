@@ -1,0 +1,658 @@
+{
+ "builds": {
+  "nr128_fsfs_k0": {
+   "binary_sha256": "eaf40c21fcf34f356a9e65b704fcbb2c2eaff7639120663df76f63e0f3ea28c5",
+   "commands": [
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k0/mod -I./legacy/work/build-nr128_fsfs_k0/mod -c ./legacy/work/build-nr128_fsfs_k0/src/SHTOOLS.f95 -o ./legacy/work/build-nr128_fsfs_k0/obj/SHTOOLS.f95.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k0/mod -I./legacy/work/build-nr128_fsfs_k0/mod -c ./legacy/work/build-nr128_fsfs_k0/src/PLegendreA.f95 -o ./legacy/work/build-nr128_fsfs_k0/obj/PLegendreA.f95.o",
+    "ar rcs ./legacy/work/build-nr128_fsfs_k0/lib/libSHTOOLS.a ./legacy/work/build-nr128_fsfs_k0/obj/SHTOOLS.f95.o ./legacy/work/build-nr128_fsfs_k0/obj/PLegendreA.f95.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k0/mod -I./legacy/work/build-nr128_fsfs_k0/mod -c ./legacy/work/build-nr128_fsfs_k0/src/constants.f90 -o ./legacy/work/build-nr128_fsfs_k0/obj/constants.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k0/mod -I./legacy/work/build-nr128_fsfs_k0/mod -c ./legacy/work/build-nr128_fsfs_k0/src/nrtype.f90 -o ./legacy/work/build-nr128_fsfs_k0/obj/nrtype.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k0/mod -I./legacy/work/build-nr128_fsfs_k0/mod -c ./legacy/work/build-nr128_fsfs_k0/src/commpi.f90 -o ./legacy/work/build-nr128_fsfs_k0/obj/commpi.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k0/mod -I./legacy/work/build-nr128_fsfs_k0/mod -c ./legacy/work/build-nr128_fsfs_k0/src/nr.f90 -o ./legacy/work/build-nr128_fsfs_k0/obj/nr.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k0/mod -I./legacy/work/build-nr128_fsfs_k0/mod -c ./legacy/work/build-nr128_fsfs_k0/src/nrutil.f90 -o ./legacy/work/build-nr128_fsfs_k0/obj/nrutil.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k0/mod -I./legacy/work/build-nr128_fsfs_k0/mod -c ./legacy/work/build-nr128_fsfs_k0/src/sph_tools.f90 -o ./legacy/work/build-nr128_fsfs_k0/obj/sph_tools.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k0/mod -I./legacy/work/build-nr128_fsfs_k0/mod -c ./legacy/work/build-nr128_fsfs_k0/src/util.f90 -o ./legacy/work/build-nr128_fsfs_k0/obj/util.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k0/mod -I./legacy/work/build-nr128_fsfs_k0/mod -c ./legacy/work/build-nr128_fsfs_k0/src/inversion.f90 -o ./legacy/work/build-nr128_fsfs_k0/obj/inversion.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k0/mod -I./legacy/work/build-nr128_fsfs_k0/mod -c ./legacy/work/build-nr128_fsfs_k0/src/mnbrak.f90 -o ./legacy/work/build-nr128_fsfs_k0/obj/mnbrak.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k0/mod -I./legacy/work/build-nr128_fsfs_k0/mod -c ./legacy/work/build-nr128_fsfs_k0/src/brent.f90 -o ./legacy/work/build-nr128_fsfs_k0/obj/brent.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k0/mod -I./legacy/work/build-nr128_fsfs_k0/mod -c ./legacy/work/build-nr128_fsfs_k0/src/linmin.f90 -o ./legacy/work/build-nr128_fsfs_k0/obj/linmin.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k0/mod -I./legacy/work/build-nr128_fsfs_k0/mod -c ./legacy/work/build-nr128_fsfs_k0/src/powell.f90 -o ./legacy/work/build-nr128_fsfs_k0/obj/powell.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k0/mod -I./legacy/work/build-nr128_fsfs_k0/mod -c ./legacy/work/build-nr128_fsfs_k0/src/linpack_q.f90 -o ./legacy/work/build-nr128_fsfs_k0/obj/linpack_q.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k0/mod -I./legacy/work/build-nr128_fsfs_k0/mod -c ./legacy/work/build-nr128_fsfs_k0/src/ref_flds.f90 -o ./legacy/work/build-nr128_fsfs_k0/obj/ref_flds.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k0/mod -I./legacy/work/build-nr128_fsfs_k0/mod -c ./legacy/work/build-nr128_fsfs_k0/src/driver.f -o ./legacy/work/build-nr128_fsfs_k0/obj/driver.f.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k0/mod -I./legacy/work/build-nr128_fsfs_k0/mod -c ./legacy/work/build-nr128_fsfs_k0/src/calc.f -o ./legacy/work/build-nr128_fsfs_k0/obj/calc.f.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k0/mod -I./legacy/work/build-nr128_fsfs_k0/mod -c ./legacy/work/build-nr128_fsfs_k0/src/matrix.f -o ./legacy/work/build-nr128_fsfs_k0/obj/matrix.f.o",
+    "/opt/homebrew/bin/mpif90 -o ./legacy/work/build-nr128_fsfs_k0/GEOID ./legacy/work/build-nr128_fsfs_k0/obj/constants.f90.o ./legacy/work/build-nr128_fsfs_k0/obj/nrtype.f90.o ./legacy/work/build-nr128_fsfs_k0/obj/commpi.f90.o ./legacy/work/build-nr128_fsfs_k0/obj/nr.f90.o ./legacy/work/build-nr128_fsfs_k0/obj/nrutil.f90.o ./legacy/work/build-nr128_fsfs_k0/obj/sph_tools.f90.o ./legacy/work/build-nr128_fsfs_k0/obj/util.f90.o ./legacy/work/build-nr128_fsfs_k0/obj/inversion.f90.o ./legacy/work/build-nr128_fsfs_k0/obj/mnbrak.f90.o ./legacy/work/build-nr128_fsfs_k0/obj/brent.f90.o ./legacy/work/build-nr128_fsfs_k0/obj/linmin.f90.o ./legacy/work/build-nr128_fsfs_k0/obj/powell.f90.o ./legacy/work/build-nr128_fsfs_k0/obj/linpack_q.f90.o ./legacy/work/build-nr128_fsfs_k0/obj/ref_flds.f90.o ./legacy/work/build-nr128_fsfs_k0/obj/driver.f.o ./legacy/work/build-nr128_fsfs_k0/obj/calc.f.o ./legacy/work/build-nr128_fsfs_k0/obj/matrix.f.o -L./legacy/work/build-nr128_fsfs_k0/lib -lSHTOOLS -L/opt/homebrew/opt/openblas/lib -llapack -lblas"
+   ],
+   "patch_constants": "--- a/constants.h\n+++ b/constants.h\n@@ -25,7 +25,7 @@\n    integer(i4b),  parameter :: l_max_calc = 50\n    !> number of radial layers (with tickness)\n    !> with nr+1 number of radial grid points\n-   integer(i4b),  parameter :: nr = 256\n+   integer(i4b),  parameter :: nr = 128\n    !> half-width of the gaussian function\n    !> for smoothing the viscosity profile\n    integer(i4b),  parameter :: hlf_ny = 100\n",
+   "patch_formats": "--- a/util.f90\n+++ b/util.f90\n@@ -174,7 +174,7 @@\n       open(333, file=trim(output)//'KERNELS/'//trim(char1)&\n      & //trim(char2), action = 'write', status='unknown')\n       do i=1,nr+1,1\n-         write(333, '(f17.2,4X, es16.7e3)') r(i)/1000, u(i)\n+         write(333, '(f17.2,4X, es25.16e3)') r(i)/1000, u(i)\n       enddo\n       close(333)\n       end subroutine kernel_out\n@@ -229,9 +229,9 @@\n       do l=l_min,l_max_calc\n          do m=0,l\n             if (m==0) then\n-                write(444,'(A,I8,I8,e15.6, e15.6)') 'SPHCO',l, m, coef(l,m), 0.\n+                write(444,'(A,I8,I8,es25.16e3, es25.16e3)') 'SPHCO',l, m, coef(l,m), 0.\n             else\n-                write(444,'(A,I8,I8,e15.6, e15.6)')  'SPHCO',l, m, coef(l,-m), coef(l,+m)\n+                write(444,'(A,I8,I8,es25.16e3, es25.16e3)')  'SPHCO',l, m, coef(l,-m), coef(l,+m)\n             endif\n          enddo\n       enddo\n"
+  },
+  "nr128_fsfs_k1": {
+   "binary_sha256": "d7c89c15bcfa99bcafa3727851ad19c62e6b556a9a75d27db778732c75d0dc73",
+   "commands": [
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k1/mod -I./legacy/work/build-nr128_fsfs_k1/mod -c ./legacy/work/build-nr128_fsfs_k1/src/SHTOOLS.f95 -o ./legacy/work/build-nr128_fsfs_k1/obj/SHTOOLS.f95.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k1/mod -I./legacy/work/build-nr128_fsfs_k1/mod -c ./legacy/work/build-nr128_fsfs_k1/src/PLegendreA.f95 -o ./legacy/work/build-nr128_fsfs_k1/obj/PLegendreA.f95.o",
+    "ar rcs ./legacy/work/build-nr128_fsfs_k1/lib/libSHTOOLS.a ./legacy/work/build-nr128_fsfs_k1/obj/SHTOOLS.f95.o ./legacy/work/build-nr128_fsfs_k1/obj/PLegendreA.f95.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k1/mod -I./legacy/work/build-nr128_fsfs_k1/mod -c ./legacy/work/build-nr128_fsfs_k1/src/constants.f90 -o ./legacy/work/build-nr128_fsfs_k1/obj/constants.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k1/mod -I./legacy/work/build-nr128_fsfs_k1/mod -c ./legacy/work/build-nr128_fsfs_k1/src/nrtype.f90 -o ./legacy/work/build-nr128_fsfs_k1/obj/nrtype.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k1/mod -I./legacy/work/build-nr128_fsfs_k1/mod -c ./legacy/work/build-nr128_fsfs_k1/src/commpi.f90 -o ./legacy/work/build-nr128_fsfs_k1/obj/commpi.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k1/mod -I./legacy/work/build-nr128_fsfs_k1/mod -c ./legacy/work/build-nr128_fsfs_k1/src/nr.f90 -o ./legacy/work/build-nr128_fsfs_k1/obj/nr.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k1/mod -I./legacy/work/build-nr128_fsfs_k1/mod -c ./legacy/work/build-nr128_fsfs_k1/src/nrutil.f90 -o ./legacy/work/build-nr128_fsfs_k1/obj/nrutil.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k1/mod -I./legacy/work/build-nr128_fsfs_k1/mod -c ./legacy/work/build-nr128_fsfs_k1/src/sph_tools.f90 -o ./legacy/work/build-nr128_fsfs_k1/obj/sph_tools.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k1/mod -I./legacy/work/build-nr128_fsfs_k1/mod -c ./legacy/work/build-nr128_fsfs_k1/src/util.f90 -o ./legacy/work/build-nr128_fsfs_k1/obj/util.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k1/mod -I./legacy/work/build-nr128_fsfs_k1/mod -c ./legacy/work/build-nr128_fsfs_k1/src/inversion.f90 -o ./legacy/work/build-nr128_fsfs_k1/obj/inversion.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k1/mod -I./legacy/work/build-nr128_fsfs_k1/mod -c ./legacy/work/build-nr128_fsfs_k1/src/mnbrak.f90 -o ./legacy/work/build-nr128_fsfs_k1/obj/mnbrak.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k1/mod -I./legacy/work/build-nr128_fsfs_k1/mod -c ./legacy/work/build-nr128_fsfs_k1/src/brent.f90 -o ./legacy/work/build-nr128_fsfs_k1/obj/brent.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k1/mod -I./legacy/work/build-nr128_fsfs_k1/mod -c ./legacy/work/build-nr128_fsfs_k1/src/linmin.f90 -o ./legacy/work/build-nr128_fsfs_k1/obj/linmin.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k1/mod -I./legacy/work/build-nr128_fsfs_k1/mod -c ./legacy/work/build-nr128_fsfs_k1/src/powell.f90 -o ./legacy/work/build-nr128_fsfs_k1/obj/powell.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k1/mod -I./legacy/work/build-nr128_fsfs_k1/mod -c ./legacy/work/build-nr128_fsfs_k1/src/linpack_q.f90 -o ./legacy/work/build-nr128_fsfs_k1/obj/linpack_q.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k1/mod -I./legacy/work/build-nr128_fsfs_k1/mod -c ./legacy/work/build-nr128_fsfs_k1/src/ref_flds.f90 -o ./legacy/work/build-nr128_fsfs_k1/obj/ref_flds.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k1/mod -I./legacy/work/build-nr128_fsfs_k1/mod -c ./legacy/work/build-nr128_fsfs_k1/src/driver.f -o ./legacy/work/build-nr128_fsfs_k1/obj/driver.f.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k1/mod -I./legacy/work/build-nr128_fsfs_k1/mod -c ./legacy/work/build-nr128_fsfs_k1/src/calc.f -o ./legacy/work/build-nr128_fsfs_k1/obj/calc.f.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsfs_k1/mod -I./legacy/work/build-nr128_fsfs_k1/mod -c ./legacy/work/build-nr128_fsfs_k1/src/matrix.f -o ./legacy/work/build-nr128_fsfs_k1/obj/matrix.f.o",
+    "/opt/homebrew/bin/mpif90 -o ./legacy/work/build-nr128_fsfs_k1/GEOID ./legacy/work/build-nr128_fsfs_k1/obj/constants.f90.o ./legacy/work/build-nr128_fsfs_k1/obj/nrtype.f90.o ./legacy/work/build-nr128_fsfs_k1/obj/commpi.f90.o ./legacy/work/build-nr128_fsfs_k1/obj/nr.f90.o ./legacy/work/build-nr128_fsfs_k1/obj/nrutil.f90.o ./legacy/work/build-nr128_fsfs_k1/obj/sph_tools.f90.o ./legacy/work/build-nr128_fsfs_k1/obj/util.f90.o ./legacy/work/build-nr128_fsfs_k1/obj/inversion.f90.o ./legacy/work/build-nr128_fsfs_k1/obj/mnbrak.f90.o ./legacy/work/build-nr128_fsfs_k1/obj/brent.f90.o ./legacy/work/build-nr128_fsfs_k1/obj/linmin.f90.o ./legacy/work/build-nr128_fsfs_k1/obj/powell.f90.o ./legacy/work/build-nr128_fsfs_k1/obj/linpack_q.f90.o ./legacy/work/build-nr128_fsfs_k1/obj/ref_flds.f90.o ./legacy/work/build-nr128_fsfs_k1/obj/driver.f.o ./legacy/work/build-nr128_fsfs_k1/obj/calc.f.o ./legacy/work/build-nr128_fsfs_k1/obj/matrix.f.o -L./legacy/work/build-nr128_fsfs_k1/lib -lSHTOOLS -L/opt/homebrew/opt/openblas/lib -llapack -lblas"
+   ],
+   "patch_constants": "--- a/constants.h\n+++ b/constants.h\n@@ -25,7 +25,7 @@\n    integer(i4b),  parameter :: l_max_calc = 50\n    !> number of radial layers (with tickness)\n    !> with nr+1 number of radial grid points\n-   integer(i4b),  parameter :: nr = 256\n+   integer(i4b),  parameter :: nr = 128\n    !> half-width of the gaussian function\n    !> for smoothing the viscosity profile\n    integer(i4b),  parameter :: hlf_ny = 100\n@@ -68,7 +68,7 @@\n    integer(i4b),  parameter:: CorrFlag = 0 \n    !> ------ ACTUAL CALCULATION PARAMETERS -------------\n    !> Which type kappaindex==1 compressible else: incompressible\n-   integer(i4b),  parameter:: kappaindex=0\n+   integer(i4b),  parameter:: kappaindex=1\n    !> Starting Depth for calculating the gravity based on\n    real(qp),      parameter:: top_depth =-100\n    real(qp),      parameter:: bot_depth = -10 \n",
+   "patch_formats": "--- a/util.f90\n+++ b/util.f90\n@@ -174,7 +174,7 @@\n       open(333, file=trim(output)//'KERNELS/'//trim(char1)&\n      & //trim(char2), action = 'write', status='unknown')\n       do i=1,nr+1,1\n-         write(333, '(f17.2,4X, es16.7e3)') r(i)/1000, u(i)\n+         write(333, '(f17.2,4X, es25.16e3)') r(i)/1000, u(i)\n       enddo\n       close(333)\n       end subroutine kernel_out\n@@ -229,9 +229,9 @@\n       do l=l_min,l_max_calc\n          do m=0,l\n             if (m==0) then\n-                write(444,'(A,I8,I8,e15.6, e15.6)') 'SPHCO',l, m, coef(l,m), 0.\n+                write(444,'(A,I8,I8,es25.16e3, es25.16e3)') 'SPHCO',l, m, coef(l,m), 0.\n             else\n-                write(444,'(A,I8,I8,e15.6, e15.6)')  'SPHCO',l, m, coef(l,-m), coef(l,+m)\n+                write(444,'(A,I8,I8,es25.16e3, es25.16e3)')  'SPHCO',l, m, coef(l,-m), coef(l,+m)\n             endif\n          enddo\n       enddo\n"
+  },
+  "nr128_fsns_k0": {
+   "binary_sha256": "13fb312e42ec6bdbbd04f1e1004cf87cb6320c82eaa73d95e4c71a4d79db2a6b",
+   "commands": [
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsns_k0/mod -I./legacy/work/build-nr128_fsns_k0/mod -c ./legacy/work/build-nr128_fsns_k0/src/SHTOOLS.f95 -o ./legacy/work/build-nr128_fsns_k0/obj/SHTOOLS.f95.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsns_k0/mod -I./legacy/work/build-nr128_fsns_k0/mod -c ./legacy/work/build-nr128_fsns_k0/src/PLegendreA.f95 -o ./legacy/work/build-nr128_fsns_k0/obj/PLegendreA.f95.o",
+    "ar rcs ./legacy/work/build-nr128_fsns_k0/lib/libSHTOOLS.a ./legacy/work/build-nr128_fsns_k0/obj/SHTOOLS.f95.o ./legacy/work/build-nr128_fsns_k0/obj/PLegendreA.f95.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsns_k0/mod -I./legacy/work/build-nr128_fsns_k0/mod -c ./legacy/work/build-nr128_fsns_k0/src/constants.f90 -o ./legacy/work/build-nr128_fsns_k0/obj/constants.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsns_k0/mod -I./legacy/work/build-nr128_fsns_k0/mod -c ./legacy/work/build-nr128_fsns_k0/src/nrtype.f90 -o ./legacy/work/build-nr128_fsns_k0/obj/nrtype.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsns_k0/mod -I./legacy/work/build-nr128_fsns_k0/mod -c ./legacy/work/build-nr128_fsns_k0/src/commpi.f90 -o ./legacy/work/build-nr128_fsns_k0/obj/commpi.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsns_k0/mod -I./legacy/work/build-nr128_fsns_k0/mod -c ./legacy/work/build-nr128_fsns_k0/src/nr.f90 -o ./legacy/work/build-nr128_fsns_k0/obj/nr.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsns_k0/mod -I./legacy/work/build-nr128_fsns_k0/mod -c ./legacy/work/build-nr128_fsns_k0/src/nrutil.f90 -o ./legacy/work/build-nr128_fsns_k0/obj/nrutil.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsns_k0/mod -I./legacy/work/build-nr128_fsns_k0/mod -c ./legacy/work/build-nr128_fsns_k0/src/sph_tools.f90 -o ./legacy/work/build-nr128_fsns_k0/obj/sph_tools.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsns_k0/mod -I./legacy/work/build-nr128_fsns_k0/mod -c ./legacy/work/build-nr128_fsns_k0/src/util.f90 -o ./legacy/work/build-nr128_fsns_k0/obj/util.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsns_k0/mod -I./legacy/work/build-nr128_fsns_k0/mod -c ./legacy/work/build-nr128_fsns_k0/src/inversion.f90 -o ./legacy/work/build-nr128_fsns_k0/obj/inversion.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsns_k0/mod -I./legacy/work/build-nr128_fsns_k0/mod -c ./legacy/work/build-nr128_fsns_k0/src/mnbrak.f90 -o ./legacy/work/build-nr128_fsns_k0/obj/mnbrak.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsns_k0/mod -I./legacy/work/build-nr128_fsns_k0/mod -c ./legacy/work/build-nr128_fsns_k0/src/brent.f90 -o ./legacy/work/build-nr128_fsns_k0/obj/brent.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsns_k0/mod -I./legacy/work/build-nr128_fsns_k0/mod -c ./legacy/work/build-nr128_fsns_k0/src/linmin.f90 -o ./legacy/work/build-nr128_fsns_k0/obj/linmin.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsns_k0/mod -I./legacy/work/build-nr128_fsns_k0/mod -c ./legacy/work/build-nr128_fsns_k0/src/powell.f90 -o ./legacy/work/build-nr128_fsns_k0/obj/powell.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsns_k0/mod -I./legacy/work/build-nr128_fsns_k0/mod -c ./legacy/work/build-nr128_fsns_k0/src/linpack_q.f90 -o ./legacy/work/build-nr128_fsns_k0/obj/linpack_q.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsns_k0/mod -I./legacy/work/build-nr128_fsns_k0/mod -c ./legacy/work/build-nr128_fsns_k0/src/ref_flds.f90 -o ./legacy/work/build-nr128_fsns_k0/obj/ref_flds.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsns_k0/mod -I./legacy/work/build-nr128_fsns_k0/mod -c ./legacy/work/build-nr128_fsns_k0/src/driver.f -o ./legacy/work/build-nr128_fsns_k0/obj/driver.f.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsns_k0/mod -I./legacy/work/build-nr128_fsns_k0/mod -c ./legacy/work/build-nr128_fsns_k0/src/calc.f -o ./legacy/work/build-nr128_fsns_k0/obj/calc.f.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_fsns_k0/mod -I./legacy/work/build-nr128_fsns_k0/mod -c ./legacy/work/build-nr128_fsns_k0/src/matrix.f -o ./legacy/work/build-nr128_fsns_k0/obj/matrix.f.o",
+    "/opt/homebrew/bin/mpif90 -o ./legacy/work/build-nr128_fsns_k0/GEOID ./legacy/work/build-nr128_fsns_k0/obj/constants.f90.o ./legacy/work/build-nr128_fsns_k0/obj/nrtype.f90.o ./legacy/work/build-nr128_fsns_k0/obj/commpi.f90.o ./legacy/work/build-nr128_fsns_k0/obj/nr.f90.o ./legacy/work/build-nr128_fsns_k0/obj/nrutil.f90.o ./legacy/work/build-nr128_fsns_k0/obj/sph_tools.f90.o ./legacy/work/build-nr128_fsns_k0/obj/util.f90.o ./legacy/work/build-nr128_fsns_k0/obj/inversion.f90.o ./legacy/work/build-nr128_fsns_k0/obj/mnbrak.f90.o ./legacy/work/build-nr128_fsns_k0/obj/brent.f90.o ./legacy/work/build-nr128_fsns_k0/obj/linmin.f90.o ./legacy/work/build-nr128_fsns_k0/obj/powell.f90.o ./legacy/work/build-nr128_fsns_k0/obj/linpack_q.f90.o ./legacy/work/build-nr128_fsns_k0/obj/ref_flds.f90.o ./legacy/work/build-nr128_fsns_k0/obj/driver.f.o ./legacy/work/build-nr128_fsns_k0/obj/calc.f.o ./legacy/work/build-nr128_fsns_k0/obj/matrix.f.o -L./legacy/work/build-nr128_fsns_k0/lib -lSHTOOLS -L/opt/homebrew/opt/openblas/lib -llapack -lblas"
+   ],
+   "patch_constants": "--- a/constants.h\n+++ b/constants.h\n@@ -25,7 +25,7 @@\n    integer(i4b),  parameter :: l_max_calc = 50\n    !> number of radial layers (with tickness)\n    !> with nr+1 number of radial grid points\n-   integer(i4b),  parameter :: nr = 256\n+   integer(i4b),  parameter :: nr = 128\n    !> half-width of the gaussian function\n    !> for smoothing the viscosity profile\n    integer(i4b),  parameter :: hlf_ny = 100\n@@ -75,7 +75,7 @@\n    !> boundary condition on top \n    integer(i4b),  parameter:: bdry=1\n    !> boundary condition on bot \n-   integer(i4b),  parameter:: bdry_bot=1\n+   integer(i4b),  parameter:: bdry_bot=0\n    !> background density\n    real(qp),      parameter:: bgrho = 4.500e+03\n    !> background Viscosity\n",
+   "patch_formats": "--- a/util.f90\n+++ b/util.f90\n@@ -174,7 +174,7 @@\n       open(333, file=trim(output)//'KERNELS/'//trim(char1)&\n      & //trim(char2), action = 'write', status='unknown')\n       do i=1,nr+1,1\n-         write(333, '(f17.2,4X, es16.7e3)') r(i)/1000, u(i)\n+         write(333, '(f17.2,4X, es25.16e3)') r(i)/1000, u(i)\n       enddo\n       close(333)\n       end subroutine kernel_out\n@@ -229,9 +229,9 @@\n       do l=l_min,l_max_calc\n          do m=0,l\n             if (m==0) then\n-                write(444,'(A,I8,I8,e15.6, e15.6)') 'SPHCO',l, m, coef(l,m), 0.\n+                write(444,'(A,I8,I8,es25.16e3, es25.16e3)') 'SPHCO',l, m, coef(l,m), 0.\n             else\n-                write(444,'(A,I8,I8,e15.6, e15.6)')  'SPHCO',l, m, coef(l,-m), coef(l,+m)\n+                write(444,'(A,I8,I8,es25.16e3, es25.16e3)')  'SPHCO',l, m, coef(l,-m), coef(l,+m)\n             endif\n          enddo\n       enddo\n"
+  },
+  "nr128_nsfs_k0": {
+   "binary_sha256": "22166f5b9b4c3b3af8f85e1065a2450c9ca7c16b88c507269fbc7f8c3335be98",
+   "commands": [
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_nsfs_k0/mod -I./legacy/work/build-nr128_nsfs_k0/mod -c ./legacy/work/build-nr128_nsfs_k0/src/SHTOOLS.f95 -o ./legacy/work/build-nr128_nsfs_k0/obj/SHTOOLS.f95.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_nsfs_k0/mod -I./legacy/work/build-nr128_nsfs_k0/mod -c ./legacy/work/build-nr128_nsfs_k0/src/PLegendreA.f95 -o ./legacy/work/build-nr128_nsfs_k0/obj/PLegendreA.f95.o",
+    "ar rcs ./legacy/work/build-nr128_nsfs_k0/lib/libSHTOOLS.a ./legacy/work/build-nr128_nsfs_k0/obj/SHTOOLS.f95.o ./legacy/work/build-nr128_nsfs_k0/obj/PLegendreA.f95.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_nsfs_k0/mod -I./legacy/work/build-nr128_nsfs_k0/mod -c ./legacy/work/build-nr128_nsfs_k0/src/constants.f90 -o ./legacy/work/build-nr128_nsfs_k0/obj/constants.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_nsfs_k0/mod -I./legacy/work/build-nr128_nsfs_k0/mod -c ./legacy/work/build-nr128_nsfs_k0/src/nrtype.f90 -o ./legacy/work/build-nr128_nsfs_k0/obj/nrtype.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_nsfs_k0/mod -I./legacy/work/build-nr128_nsfs_k0/mod -c ./legacy/work/build-nr128_nsfs_k0/src/commpi.f90 -o ./legacy/work/build-nr128_nsfs_k0/obj/commpi.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_nsfs_k0/mod -I./legacy/work/build-nr128_nsfs_k0/mod -c ./legacy/work/build-nr128_nsfs_k0/src/nr.f90 -o ./legacy/work/build-nr128_nsfs_k0/obj/nr.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_nsfs_k0/mod -I./legacy/work/build-nr128_nsfs_k0/mod -c ./legacy/work/build-nr128_nsfs_k0/src/nrutil.f90 -o ./legacy/work/build-nr128_nsfs_k0/obj/nrutil.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_nsfs_k0/mod -I./legacy/work/build-nr128_nsfs_k0/mod -c ./legacy/work/build-nr128_nsfs_k0/src/sph_tools.f90 -o ./legacy/work/build-nr128_nsfs_k0/obj/sph_tools.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_nsfs_k0/mod -I./legacy/work/build-nr128_nsfs_k0/mod -c ./legacy/work/build-nr128_nsfs_k0/src/util.f90 -o ./legacy/work/build-nr128_nsfs_k0/obj/util.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_nsfs_k0/mod -I./legacy/work/build-nr128_nsfs_k0/mod -c ./legacy/work/build-nr128_nsfs_k0/src/inversion.f90 -o ./legacy/work/build-nr128_nsfs_k0/obj/inversion.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_nsfs_k0/mod -I./legacy/work/build-nr128_nsfs_k0/mod -c ./legacy/work/build-nr128_nsfs_k0/src/mnbrak.f90 -o ./legacy/work/build-nr128_nsfs_k0/obj/mnbrak.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_nsfs_k0/mod -I./legacy/work/build-nr128_nsfs_k0/mod -c ./legacy/work/build-nr128_nsfs_k0/src/brent.f90 -o ./legacy/work/build-nr128_nsfs_k0/obj/brent.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_nsfs_k0/mod -I./legacy/work/build-nr128_nsfs_k0/mod -c ./legacy/work/build-nr128_nsfs_k0/src/linmin.f90 -o ./legacy/work/build-nr128_nsfs_k0/obj/linmin.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_nsfs_k0/mod -I./legacy/work/build-nr128_nsfs_k0/mod -c ./legacy/work/build-nr128_nsfs_k0/src/powell.f90 -o ./legacy/work/build-nr128_nsfs_k0/obj/powell.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_nsfs_k0/mod -I./legacy/work/build-nr128_nsfs_k0/mod -c ./legacy/work/build-nr128_nsfs_k0/src/linpack_q.f90 -o ./legacy/work/build-nr128_nsfs_k0/obj/linpack_q.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_nsfs_k0/mod -I./legacy/work/build-nr128_nsfs_k0/mod -c ./legacy/work/build-nr128_nsfs_k0/src/ref_flds.f90 -o ./legacy/work/build-nr128_nsfs_k0/obj/ref_flds.f90.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_nsfs_k0/mod -I./legacy/work/build-nr128_nsfs_k0/mod -c ./legacy/work/build-nr128_nsfs_k0/src/driver.f -o ./legacy/work/build-nr128_nsfs_k0/obj/driver.f.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_nsfs_k0/mod -I./legacy/work/build-nr128_nsfs_k0/mod -c ./legacy/work/build-nr128_nsfs_k0/src/calc.f -o ./legacy/work/build-nr128_nsfs_k0/obj/calc.f.o",
+    "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr128_nsfs_k0/mod -I./legacy/work/build-nr128_nsfs_k0/mod -c ./legacy/work/build-nr128_nsfs_k0/src/matrix.f -o ./legacy/work/build-nr128_nsfs_k0/obj/matrix.f.o",
+    "/opt/homebrew/bin/mpif90 -o ./legacy/work/build-nr128_nsfs_k0/GEOID ./legacy/work/build-nr128_nsfs_k0/obj/constants.f90.o ./legacy/work/build-nr128_nsfs_k0/obj/nrtype.f90.o ./legacy/work/build-nr128_nsfs_k0/obj/commpi.f90.o ./legacy/work/build-nr128_nsfs_k0/obj/nr.f90.o ./legacy/work/build-nr128_nsfs_k0/obj/nrutil.f90.o ./legacy/work/build-nr128_nsfs_k0/obj/sph_tools.f90.o ./legacy/work/build-nr128_nsfs_k0/obj/util.f90.o ./legacy/work/build-nr128_nsfs_k0/obj/inversion.f90.o ./legacy/work/build-nr128_nsfs_k0/obj/mnbrak.f90.o ./legacy/work/build-nr128_nsfs_k0/obj/brent.f90.o ./legacy/work/build-nr128_nsfs_k0/obj/linmin.f90.o ./legacy/work/build-nr128_nsfs_k0/obj/powell.f90.o ./legacy/work/build-nr128_nsfs_k0/obj/linpack_q.f90.o ./legacy/work/build-nr128_nsfs_k0/obj/ref_flds.f90.o ./legacy/work/build-nr128_nsfs_k0/obj/driver.f.o ./legacy/work/build-nr128_nsfs_k0/obj/calc.f.o ./legacy/work/build-nr128_nsfs_k0/obj/matrix.f.o -L./legacy/work/build-nr128_nsfs_k0/lib -lSHTOOLS -L/opt/homebrew/opt/openblas/lib -llapack -lblas"
+   ],
+   "patch_constants": "--- a/constants.h\n+++ b/constants.h\n@@ -25,7 +25,7 @@\n    integer(i4b),  parameter :: l_max_calc = 50\n    !> number of radial layers (with tickness)\n    !> with nr+1 number of radial grid points\n-   integer(i4b),  parameter :: nr = 256\n+   integer(i4b),  parameter :: nr = 128\n    !> half-width of the gaussian function\n    !> for smoothing the viscosity profile\n    integer(i4b),  parameter :: hlf_ny = 100\n@@ -73,7 +73,7 @@\n    real(qp),      parameter:: top_depth =-100\n    real(qp),      parameter:: bot_depth = -10 \n    !> boundary condition on top \n-   integer(i4b),  parameter:: bdry=1\n+   integer(i4b),  parameter:: bdry=0\n    !> boundary condition on bot \n    integer(i4b),  parameter:: bdry_bot=1\n    !> background density\n",
+   "patch_formats": "--- a/util.f90\n+++ b/util.f90\n@@ -174,7 +174,7 @@\n       open(333, file=trim(output)//'KERNELS/'//trim(char1)&\n      & //trim(char2), action = 'write', status='unknown')\n       do i=1,nr+1,1\n-         write(333, '(f17.2,4X, es16.7e3)') r(i)/1000, u(i)\n+         write(333, '(f17.2,4X, es25.16e3)') r(i)/1000, u(i)\n       enddo\n       close(333)\n       end subroutine kernel_out\n@@ -229,9 +229,9 @@\n       do l=l_min,l_max_calc\n          do m=0,l\n             if (m==0) then\n-                write(444,'(A,I8,I8,e15.6, e15.6)') 'SPHCO',l, m, coef(l,m), 0.\n+                write(444,'(A,I8,I8,es25.16e3, es25.16e3)') 'SPHCO',l, m, coef(l,m), 0.\n             else\n-                write(444,'(A,I8,I8,e15.6, e15.6)')  'SPHCO',l, m, coef(l,-m), coef(l,+m)\n+                write(444,'(A,I8,I8,es25.16e3, es25.16e3)')  'SPHCO',l, m, coef(l,-m), coef(l,+m)\n             endif\n          enddo\n       enddo\n"
+  }
+ },
+ "cases_py_sha256": "5e05422d937998ed5329726503c5ecf9bb137d6d9c3af9f471e9486ffa466574",
+ "cases_py_sha256_oracle": "5e05422d937998ed5329726503c5ecf9bb137d6d9c3af9f471e9486ffa466574",
+ "diagnostics": {
+  "iso_fsfs_strict": {
+   "build": {
+    "binary_sha256": "82d797b74265d9126f992d8655e5d17ebd4905ae420d5744531a206bdfb1951a",
+    "commands": [
+     "/opt/homebrew/bin/mpif90 -O2 -J./legacy/work/build-nr128_fsfs_k0_strict/mod -I./legacy/work/build-nr128_fsfs_k0_strict/mod -c ./legacy/work/build-nr128_fsfs_k0_strict/src/SHTOOLS.f95 -o ./legacy/work/build-nr128_fsfs_k0_strict/obj/SHTOOLS.f95.o",
+     "/opt/homebrew/bin/mpif90 -O2 -J./legacy/work/build-nr128_fsfs_k0_strict/mod -I./legacy/work/build-nr128_fsfs_k0_strict/mod -c ./legacy/work/build-nr128_fsfs_k0_strict/src/PLegendreA.f95 -o ./legacy/work/build-nr128_fsfs_k0_strict/obj/PLegendreA.f95.o",
+     "ar rcs ./legacy/work/build-nr128_fsfs_k0_strict/lib/libSHTOOLS.a ./legacy/work/build-nr128_fsfs_k0_strict/obj/SHTOOLS.f95.o ./legacy/work/build-nr128_fsfs_k0_strict/obj/PLegendreA.f95.o",
+     "/opt/homebrew/bin/mpif90 -O2 -J./legacy/work/build-nr128_fsfs_k0_strict/mod -I./legacy/work/build-nr128_fsfs_k0_strict/mod -c ./legacy/work/build-nr128_fsfs_k0_strict/src/constants.f90 -o ./legacy/work/build-nr128_fsfs_k0_strict/obj/constants.f90.o",
+     "/opt/homebrew/bin/mpif90 -O2 -J./legacy/work/build-nr128_fsfs_k0_strict/mod -I./legacy/work/build-nr128_fsfs_k0_strict/mod -c ./legacy/work/build-nr128_fsfs_k0_strict/src/nrtype.f90 -o ./legacy/work/build-nr128_fsfs_k0_strict/obj/nrtype.f90.o",
+     "/opt/homebrew/bin/mpif90 -O2 -J./legacy/work/build-nr128_fsfs_k0_strict/mod -I./legacy/work/build-nr128_fsfs_k0_strict/mod -c ./legacy/work/build-nr128_fsfs_k0_strict/src/commpi.f90 -o ./legacy/work/build-nr128_fsfs_k0_strict/obj/commpi.f90.o",
+     "/opt/homebrew/bin/mpif90 -O2 -J./legacy/work/build-nr128_fsfs_k0_strict/mod -I./legacy/work/build-nr128_fsfs_k0_strict/mod -c ./legacy/work/build-nr128_fsfs_k0_strict/src/nr.f90 -o ./legacy/work/build-nr128_fsfs_k0_strict/obj/nr.f90.o",
+     "/opt/homebrew/bin/mpif90 -O2 -J./legacy/work/build-nr128_fsfs_k0_strict/mod -I./legacy/work/build-nr128_fsfs_k0_strict/mod -c ./legacy/work/build-nr128_fsfs_k0_strict/src/nrutil.f90 -o ./legacy/work/build-nr128_fsfs_k0_strict/obj/nrutil.f90.o",
+     "/opt/homebrew/bin/mpif90 -O2 -J./legacy/work/build-nr128_fsfs_k0_strict/mod -I./legacy/work/build-nr128_fsfs_k0_strict/mod -c ./legacy/work/build-nr128_fsfs_k0_strict/src/sph_tools.f90 -o ./legacy/work/build-nr128_fsfs_k0_strict/obj/sph_tools.f90.o",
+     "/opt/homebrew/bin/mpif90 -O2 -J./legacy/work/build-nr128_fsfs_k0_strict/mod -I./legacy/work/build-nr128_fsfs_k0_strict/mod -c ./legacy/work/build-nr128_fsfs_k0_strict/src/util.f90 -o ./legacy/work/build-nr128_fsfs_k0_strict/obj/util.f90.o",
+     "/opt/homebrew/bin/mpif90 -O2 -J./legacy/work/build-nr128_fsfs_k0_strict/mod -I./legacy/work/build-nr128_fsfs_k0_strict/mod -c ./legacy/work/build-nr128_fsfs_k0_strict/src/inversion.f90 -o ./legacy/work/build-nr128_fsfs_k0_strict/obj/inversion.f90.o",
+     "/opt/homebrew/bin/mpif90 -O2 -J./legacy/work/build-nr128_fsfs_k0_strict/mod -I./legacy/work/build-nr128_fsfs_k0_strict/mod -c ./legacy/work/build-nr128_fsfs_k0_strict/src/mnbrak.f90 -o ./legacy/work/build-nr128_fsfs_k0_strict/obj/mnbrak.f90.o",
+     "/opt/homebrew/bin/mpif90 -O2 -J./legacy/work/build-nr128_fsfs_k0_strict/mod -I./legacy/work/build-nr128_fsfs_k0_strict/mod -c ./legacy/work/build-nr128_fsfs_k0_strict/src/brent.f90 -o ./legacy/work/build-nr128_fsfs_k0_strict/obj/brent.f90.o",
+     "/opt/homebrew/bin/mpif90 -O2 -J./legacy/work/build-nr128_fsfs_k0_strict/mod -I./legacy/work/build-nr128_fsfs_k0_strict/mod -c ./legacy/work/build-nr128_fsfs_k0_strict/src/linmin.f90 -o ./legacy/work/build-nr128_fsfs_k0_strict/obj/linmin.f90.o",
+     "/opt/homebrew/bin/mpif90 -O2 -J./legacy/work/build-nr128_fsfs_k0_strict/mod -I./legacy/work/build-nr128_fsfs_k0_strict/mod -c ./legacy/work/build-nr128_fsfs_k0_strict/src/powell.f90 -o ./legacy/work/build-nr128_fsfs_k0_strict/obj/powell.f90.o",
+     "/opt/homebrew/bin/mpif90 -O2 -J./legacy/work/build-nr128_fsfs_k0_strict/mod -I./legacy/work/build-nr128_fsfs_k0_strict/mod -c ./legacy/work/build-nr128_fsfs_k0_strict/src/linpack_q.f90 -o ./legacy/work/build-nr128_fsfs_k0_strict/obj/linpack_q.f90.o",
+     "/opt/homebrew/bin/mpif90 -O2 -J./legacy/work/build-nr128_fsfs_k0_strict/mod -I./legacy/work/build-nr128_fsfs_k0_strict/mod -c ./legacy/work/build-nr128_fsfs_k0_strict/src/ref_flds.f90 -o ./legacy/work/build-nr128_fsfs_k0_strict/obj/ref_flds.f90.o",
+     "/opt/homebrew/bin/mpif90 -O2 -J./legacy/work/build-nr128_fsfs_k0_strict/mod -I./legacy/work/build-nr128_fsfs_k0_strict/mod -c ./legacy/work/build-nr128_fsfs_k0_strict/src/driver.f -o ./legacy/work/build-nr128_fsfs_k0_strict/obj/driver.f.o",
+     "/opt/homebrew/bin/mpif90 -O2 -J./legacy/work/build-nr128_fsfs_k0_strict/mod -I./legacy/work/build-nr128_fsfs_k0_strict/mod -c ./legacy/work/build-nr128_fsfs_k0_strict/src/calc.f -o ./legacy/work/build-nr128_fsfs_k0_strict/obj/calc.f.o",
+     "/opt/homebrew/bin/mpif90 -O2 -J./legacy/work/build-nr128_fsfs_k0_strict/mod -I./legacy/work/build-nr128_fsfs_k0_strict/mod -c ./legacy/work/build-nr128_fsfs_k0_strict/src/matrix.f -o ./legacy/work/build-nr128_fsfs_k0_strict/obj/matrix.f.o",
+     "/opt/homebrew/bin/mpif90 -o ./legacy/work/build-nr128_fsfs_k0_strict/GEOID ./legacy/work/build-nr128_fsfs_k0_strict/obj/constants.f90.o ./legacy/work/build-nr128_fsfs_k0_strict/obj/nrtype.f90.o ./legacy/work/build-nr128_fsfs_k0_strict/obj/commpi.f90.o ./legacy/work/build-nr128_fsfs_k0_strict/obj/nr.f90.o ./legacy/work/build-nr128_fsfs_k0_strict/obj/nrutil.f90.o ./legacy/work/build-nr128_fsfs_k0_strict/obj/sph_tools.f90.o ./legacy/work/build-nr128_fsfs_k0_strict/obj/util.f90.o ./legacy/work/build-nr128_fsfs_k0_strict/obj/inversion.f90.o ./legacy/work/build-nr128_fsfs_k0_strict/obj/mnbrak.f90.o ./legacy/work/build-nr128_fsfs_k0_strict/obj/brent.f90.o ./legacy/work/build-nr128_fsfs_k0_strict/obj/linmin.f90.o ./legacy/work/build-nr128_fsfs_k0_strict/obj/powell.f90.o ./legacy/work/build-nr128_fsfs_k0_strict/obj/linpack_q.f90.o ./legacy/work/build-nr128_fsfs_k0_strict/obj/ref_flds.f90.o ./legacy/work/build-nr128_fsfs_k0_strict/obj/driver.f.o ./legacy/work/build-nr128_fsfs_k0_strict/obj/calc.f.o ./legacy/work/build-nr128_fsfs_k0_strict/obj/matrix.f.o -L./legacy/work/build-nr128_fsfs_k0_strict/lib -lSHTOOLS -L/opt/homebrew/opt/openblas/lib -llapack -lblas"
+    ],
+    "patch_constants": "--- a/constants.h\n+++ b/constants.h\n@@ -25,7 +25,7 @@\n    integer(i4b),  parameter :: l_max_calc = 50\n    !> number of radial layers (with tickness)\n    !> with nr+1 number of radial grid points\n-   integer(i4b),  parameter :: nr = 256\n+   integer(i4b),  parameter :: nr = 128\n    !> half-width of the gaussian function\n    !> for smoothing the viscosity profile\n    integer(i4b),  parameter :: hlf_ny = 100\n",
+    "patch_formats": "--- a/util.f90\n+++ b/util.f90\n@@ -174,7 +174,7 @@\n       open(333, file=trim(output)//'KERNELS/'//trim(char1)&\n      & //trim(char2), action = 'write', status='unknown')\n       do i=1,nr+1,1\n-         write(333, '(f17.2,4X, es16.7e3)') r(i)/1000, u(i)\n+         write(333, '(f17.2,4X, es25.16e3)') r(i)/1000, u(i)\n       enddo\n       close(333)\n       end subroutine kernel_out\n@@ -229,9 +229,9 @@\n       do l=l_min,l_max_calc\n          do m=0,l\n             if (m==0) then\n-                write(444,'(A,I8,I8,e15.6, e15.6)') 'SPHCO',l, m, coef(l,m), 0.\n+                write(444,'(A,I8,I8,es25.16e3, es25.16e3)') 'SPHCO',l, m, coef(l,m), 0.\n             else\n-                write(444,'(A,I8,I8,e15.6, e15.6)')  'SPHCO',l, m, coef(l,-m), coef(l,+m)\n+                write(444,'(A,I8,I8,es25.16e3, es25.16e3)')  'SPHCO',l, m, coef(l,-m), coef(l,+m)\n             endif\n          enddo\n       enddo\n"
+   },
+   "max_e_l_against_iso_fsfs": 1.140233426785888e-19,
+   "seconds": 3.685850143432617
+  },
+  "toolchain_ishan257": {
+   "build": {
+    "binary_sha256": "df45ab140dff818af40794a3fc5d7d793bbb624afaecbfcdd81f0fbab4623ec3",
+    "commands": [
+     "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr256_fsfs_k0/mod -I./legacy/work/build-nr256_fsfs_k0/mod -c ./legacy/work/build-nr256_fsfs_k0/src/SHTOOLS.f95 -o ./legacy/work/build-nr256_fsfs_k0/obj/SHTOOLS.f95.o",
+     "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr256_fsfs_k0/mod -I./legacy/work/build-nr256_fsfs_k0/mod -c ./legacy/work/build-nr256_fsfs_k0/src/PLegendreA.f95 -o ./legacy/work/build-nr256_fsfs_k0/obj/PLegendreA.f95.o",
+     "ar rcs ./legacy/work/build-nr256_fsfs_k0/lib/libSHTOOLS.a ./legacy/work/build-nr256_fsfs_k0/obj/SHTOOLS.f95.o ./legacy/work/build-nr256_fsfs_k0/obj/PLegendreA.f95.o",
+     "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr256_fsfs_k0/mod -I./legacy/work/build-nr256_fsfs_k0/mod -c ./legacy/work/build-nr256_fsfs_k0/src/constants.f90 -o ./legacy/work/build-nr256_fsfs_k0/obj/constants.f90.o",
+     "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr256_fsfs_k0/mod -I./legacy/work/build-nr256_fsfs_k0/mod -c ./legacy/work/build-nr256_fsfs_k0/src/nrtype.f90 -o ./legacy/work/build-nr256_fsfs_k0/obj/nrtype.f90.o",
+     "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr256_fsfs_k0/mod -I./legacy/work/build-nr256_fsfs_k0/mod -c ./legacy/work/build-nr256_fsfs_k0/src/commpi.f90 -o ./legacy/work/build-nr256_fsfs_k0/obj/commpi.f90.o",
+     "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr256_fsfs_k0/mod -I./legacy/work/build-nr256_fsfs_k0/mod -c ./legacy/work/build-nr256_fsfs_k0/src/nr.f90 -o ./legacy/work/build-nr256_fsfs_k0/obj/nr.f90.o",
+     "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr256_fsfs_k0/mod -I./legacy/work/build-nr256_fsfs_k0/mod -c ./legacy/work/build-nr256_fsfs_k0/src/nrutil.f90 -o ./legacy/work/build-nr256_fsfs_k0/obj/nrutil.f90.o",
+     "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr256_fsfs_k0/mod -I./legacy/work/build-nr256_fsfs_k0/mod -c ./legacy/work/build-nr256_fsfs_k0/src/sph_tools.f90 -o ./legacy/work/build-nr256_fsfs_k0/obj/sph_tools.f90.o",
+     "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr256_fsfs_k0/mod -I./legacy/work/build-nr256_fsfs_k0/mod -c ./legacy/work/build-nr256_fsfs_k0/src/util.f90 -o ./legacy/work/build-nr256_fsfs_k0/obj/util.f90.o",
+     "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr256_fsfs_k0/mod -I./legacy/work/build-nr256_fsfs_k0/mod -c ./legacy/work/build-nr256_fsfs_k0/src/inversion.f90 -o ./legacy/work/build-nr256_fsfs_k0/obj/inversion.f90.o",
+     "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr256_fsfs_k0/mod -I./legacy/work/build-nr256_fsfs_k0/mod -c ./legacy/work/build-nr256_fsfs_k0/src/mnbrak.f90 -o ./legacy/work/build-nr256_fsfs_k0/obj/mnbrak.f90.o",
+     "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr256_fsfs_k0/mod -I./legacy/work/build-nr256_fsfs_k0/mod -c ./legacy/work/build-nr256_fsfs_k0/src/brent.f90 -o ./legacy/work/build-nr256_fsfs_k0/obj/brent.f90.o",
+     "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr256_fsfs_k0/mod -I./legacy/work/build-nr256_fsfs_k0/mod -c ./legacy/work/build-nr256_fsfs_k0/src/linmin.f90 -o ./legacy/work/build-nr256_fsfs_k0/obj/linmin.f90.o",
+     "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr256_fsfs_k0/mod -I./legacy/work/build-nr256_fsfs_k0/mod -c ./legacy/work/build-nr256_fsfs_k0/src/powell.f90 -o ./legacy/work/build-nr256_fsfs_k0/obj/powell.f90.o",
+     "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr256_fsfs_k0/mod -I./legacy/work/build-nr256_fsfs_k0/mod -c ./legacy/work/build-nr256_fsfs_k0/src/linpack_q.f90 -o ./legacy/work/build-nr256_fsfs_k0/obj/linpack_q.f90.o",
+     "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr256_fsfs_k0/mod -I./legacy/work/build-nr256_fsfs_k0/mod -c ./legacy/work/build-nr256_fsfs_k0/src/ref_flds.f90 -o ./legacy/work/build-nr256_fsfs_k0/obj/ref_flds.f90.o",
+     "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr256_fsfs_k0/mod -I./legacy/work/build-nr256_fsfs_k0/mod -c ./legacy/work/build-nr256_fsfs_k0/src/driver.f -o ./legacy/work/build-nr256_fsfs_k0/obj/driver.f.o",
+     "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr256_fsfs_k0/mod -I./legacy/work/build-nr256_fsfs_k0/mod -c ./legacy/work/build-nr256_fsfs_k0/src/calc.f -o ./legacy/work/build-nr256_fsfs_k0/obj/calc.f.o",
+     "/opt/homebrew/bin/mpif90 -O3 -ffast-math -J./legacy/work/build-nr256_fsfs_k0/mod -I./legacy/work/build-nr256_fsfs_k0/mod -c ./legacy/work/build-nr256_fsfs_k0/src/matrix.f -o ./legacy/work/build-nr256_fsfs_k0/obj/matrix.f.o",
+     "/opt/homebrew/bin/mpif90 -o ./legacy/work/build-nr256_fsfs_k0/GEOID ./legacy/work/build-nr256_fsfs_k0/obj/constants.f90.o ./legacy/work/build-nr256_fsfs_k0/obj/nrtype.f90.o ./legacy/work/build-nr256_fsfs_k0/obj/commpi.f90.o ./legacy/work/build-nr256_fsfs_k0/obj/nr.f90.o ./legacy/work/build-nr256_fsfs_k0/obj/nrutil.f90.o ./legacy/work/build-nr256_fsfs_k0/obj/sph_tools.f90.o ./legacy/work/build-nr256_fsfs_k0/obj/util.f90.o ./legacy/work/build-nr256_fsfs_k0/obj/inversion.f90.o ./legacy/work/build-nr256_fsfs_k0/obj/mnbrak.f90.o ./legacy/work/build-nr256_fsfs_k0/obj/brent.f90.o ./legacy/work/build-nr256_fsfs_k0/obj/linmin.f90.o ./legacy/work/build-nr256_fsfs_k0/obj/powell.f90.o ./legacy/work/build-nr256_fsfs_k0/obj/linpack_q.f90.o ./legacy/work/build-nr256_fsfs_k0/obj/ref_flds.f90.o ./legacy/work/build-nr256_fsfs_k0/obj/driver.f.o ./legacy/work/build-nr256_fsfs_k0/obj/calc.f.o ./legacy/work/build-nr256_fsfs_k0/obj/matrix.f.o -L./legacy/work/build-nr256_fsfs_k0/lib -lSHTOOLS -L/opt/homebrew/opt/openblas/lib -llapack -lblas"
+    ],
+    "patch_constants": "",
+    "patch_formats": "--- a/util.f90\n+++ b/util.f90\n@@ -174,7 +174,7 @@\n       open(333, file=trim(output)//'KERNELS/'//trim(char1)&\n      & //trim(char2), action = 'write', status='unknown')\n       do i=1,nr+1,1\n-         write(333, '(f17.2,4X, es16.7e3)') r(i)/1000, u(i)\n+         write(333, '(f17.2,4X, es25.16e3)') r(i)/1000, u(i)\n       enddo\n       close(333)\n       end subroutine kernel_out\n@@ -229,9 +229,9 @@\n       do l=l_min,l_max_calc\n          do m=0,l\n             if (m==0) then\n-                write(444,'(A,I8,I8,e15.6, e15.6)') 'SPHCO',l, m, coef(l,m), 0.\n+                write(444,'(A,I8,I8,es25.16e3, es25.16e3)') 'SPHCO',l, m, coef(l,m), 0.\n             else\n-                write(444,'(A,I8,I8,e15.6, e15.6)')  'SPHCO',l, m, coef(l,-m), coef(l,+m)\n+                write(444,'(A,I8,I8,es25.16e3, es25.16e3)')  'SPHCO',l, m, coef(l,-m), coef(l,+m)\n             endif\n          enddo\n       enddo\n"
+   },
+   "max_e_l_against_historical": {
+    "cmbtopo": 2.4549771853196304e-06,
+    "geoid": 8.590690323457994e-06,
+    "gravity": 8.60470295174933e-06,
+    "surftopo": 2.551840394110281e-06,
+    "surfvel": 6.436431016457722e-06
+   },
+   "max_rel_end_node_historical": 1.7283700026737847e-08,
+   "seconds": 3.8985188007354736
+  }
+ },
+ "fortran": {
+  "hager4_fsfs": {
+   "build": "nr128_fsfs_k0",
+   "date": "2026-11-11T01:28:18",
+   "host": "reunion",
+   "inputs": {
+    "density": "synthetic.sph",
+    "density_sha256": "71fff1f4e9271b80b62792244b45ad777da781067a45c7a06bee23e4b7be181f",
+    "viscosity": "hager4.visc",
+    "viscosity_sha256": "576e9241f958c1a803b051833da04d77f7c8f1d49a723424eef35b2036ed55f0"
+   },
+   "npz": "fortran/hager4_fsfs.npz",
+   "npz_sha256": "247804f50fa2eb621dad6e31bd459e24b64d06e27e4c11991cb30a144ba5a616",
+   "raw": {
+    "combined_sha256": "c964387e9b570f399dbb56377e4726b05908e5d09a745febf080180cf2ccedaa",
+    "n_files": 319
+   },
+   "seconds": 3.31,
+   "spec": {
+    "bdry": 1,
+    "bdry_bot": 1,
+    "density": "synthetic",
+    "kappaindex": 0,
+    "visc": "hager4"
+   }
+  },
+  "hager4_fsfs_lebedev": {
+   "build": "nr128_fsfs_k0",
+   "date": "2026-11-11T01:28:42",
+   "host": "reunion",
+   "inputs": {
+    "density": "LEBEDEV_S4RTS.sph",
+    "density_sha256": "ba0f0c8f59f697adc2a7e92bc3fc9d6db116e85477da4f7b6d750fa91b3c52ec",
+    "viscosity": "hager4.visc",
+    "viscosity_sha256": "576e9241f958c1a803b051833da04d77f7c8f1d49a723424eef35b2036ed55f0"
+   },
+   "npz": "fortran/hager4_fsfs_lebedev.npz",
+   "npz_sha256": "46cd549eda1ccccf05c60153268e0f076b71aee374655dd337caa00b60b6877e",
+   "raw": {
+    "combined_sha256": "b1cc59f96aa1febabf534fb389b8e22e30bf8ea4248f93bf9de6d75e72e2c37f",
+    "n_files": 319
+   },
+   "seconds": 3.24,
+   "spec": {
+    "bdry": 1,
+    "bdry_bot": 1,
+    "density": "lebedev",
+    "fields_only": true,
+    "kappaindex": 0,
+    "visc": "hager4"
+   }
+  },
+  "hager4_fsfs_tala": {
+   "build": "nr128_fsfs_k1",
+   "date": "2026-11-11T01:28:38",
+   "host": "reunion",
+   "inputs": {
+    "density": "synthetic.sph",
+    "density_sha256": "71fff1f4e9271b80b62792244b45ad777da781067a45c7a06bee23e4b7be181f",
+    "viscosity": "hager4.visc",
+    "viscosity_sha256": "576e9241f958c1a803b051833da04d77f7c8f1d49a723424eef35b2036ed55f0"
+   },
+   "npz": "fortran/hager4_fsfs_tala.npz",
+   "npz_sha256": "b4c6431c8e32f7fc4174c8e93cd3a99a85b81ba7a808db0f77cf965fc0362f20",
+   "raw": {
+    "combined_sha256": "5aba4e6c7379b0db5836485eaec437ca10345ff717450626158db7d9cc18acde",
+    "n_files": 319
+   },
+   "seconds": 3.46,
+   "spec": {
+    "bdry": 1,
+    "bdry_bot": 1,
+    "density": "synthetic",
+    "kappaindex": 1,
+    "visc": "hager4"
+   }
+  },
+  "hager4_nsfs": {
+   "build": "nr128_nsfs_k0",
+   "date": "2026-11-11T01:28:30",
+   "host": "reunion",
+   "inputs": {
+    "density": "synthetic.sph",
+    "density_sha256": "71fff1f4e9271b80b62792244b45ad777da781067a45c7a06bee23e4b7be181f",
+    "viscosity": "hager4.visc",
+    "viscosity_sha256": "576e9241f958c1a803b051833da04d77f7c8f1d49a723424eef35b2036ed55f0"
+   },
+   "npz": "fortran/hager4_nsfs.npz",
+   "npz_sha256": "6a16e7b083c44ca26bb806ee14e84e5e5bc5a1848ac4cf4a220e85fac86c2f9f",
+   "raw": {
+    "combined_sha256": "9547a58aae686384943713a7bc22f34d712b9ffcae7758e63d760c947f8896ce",
+    "n_files": 319
+   },
+   "seconds": 3.26,
+   "spec": {
+    "bdry": 0,
+    "bdry_bot": 1,
+    "density": "synthetic",
+    "kappaindex": 0,
+    "visc": "hager4"
+   }
+  },
+  "iso_fsfs": {
+   "build": "nr128_fsfs_k0",
+   "date": "2026-11-11T01:28:14",
+   "host": "reunion",
+   "inputs": {
+    "density": "synthetic.sph",
+    "density_sha256": "71fff1f4e9271b80b62792244b45ad777da781067a45c7a06bee23e4b7be181f",
+    "viscosity": "iso.visc",
+    "viscosity_sha256": "a1f6f17030757f48fbe2c2f9c408dd8675f9d1bb3c640127b653c598d7de7299"
+   },
+   "npz": "fortran/iso_fsfs.npz",
+   "npz_sha256": "8f175e32fc26bf94181dc47176d7665ead02f7d7f3704c666464a400cdf47095",
+   "raw": {
+    "combined_sha256": "6b7139f6936b1ba85a57e45c228eeb76869666c3e76fc45b92522990ac008808",
+    "n_files": 319
+   },
+   "seconds": 3.48,
+   "spec": {
+    "bdry": 1,
+    "bdry_bot": 1,
+    "density": "synthetic",
+    "kappaindex": 0,
+    "visc": "iso"
+   }
+  },
+  "iso_fsns": {
+   "build": "nr128_fsns_k0",
+   "date": "2026-11-11T01:28:34",
+   "host": "reunion",
+   "inputs": {
+    "density": "synthetic.sph",
+    "density_sha256": "71fff1f4e9271b80b62792244b45ad777da781067a45c7a06bee23e4b7be181f",
+    "viscosity": "iso.visc",
+    "viscosity_sha256": "a1f6f17030757f48fbe2c2f9c408dd8675f9d1bb3c640127b653c598d7de7299"
+   },
+   "npz": "fortran/iso_fsns.npz",
+   "npz_sha256": "e24d15ec62dda5959957a42adf014eefbbe414efae2bfde49650ccdffb563811",
+   "raw": {
+    "combined_sha256": "ca5fc30e99f79e58c9d4a1c850c2cfcc41426c10cdb9fdd885510326edd016b2",
+    "n_files": 319
+   },
+   "seconds": 3.4,
+   "spec": {
+    "bdry": 1,
+    "bdry_bot": 0,
+    "density": "synthetic",
+    "fields": false,
+    "kappaindex": 0,
+    "visc": "iso"
+   }
+  },
+  "iso_nsfs": {
+   "build": "nr128_nsfs_k0",
+   "date": "2026-11-11T01:28:26",
+   "host": "reunion",
+   "inputs": {
+    "density": "synthetic.sph",
+    "density_sha256": "71fff1f4e9271b80b62792244b45ad777da781067a45c7a06bee23e4b7be181f",
+    "viscosity": "iso.visc",
+    "viscosity_sha256": "a1f6f17030757f48fbe2c2f9c408dd8675f9d1bb3c640127b653c598d7de7299"
+   },
+   "npz": "fortran/iso_nsfs.npz",
+   "npz_sha256": "b7735dcdfe081072e8a25bf18562f4333fe3fcb0498b456cd88e69ed0cd30e81",
+   "raw": {
+    "combined_sha256": "280f51b817d341080fadd8c276db844baa88da79b5304c7137aa1af1650c35cc",
+    "n_files": 319
+   },
+   "seconds": 3.41,
+   "spec": {
+    "bdry": 0,
+    "bdry_bot": 1,
+    "density": "synthetic",
+    "fields": false,
+    "kappaindex": 0,
+    "visc": "iso"
+   }
+  },
+  "smooth_fsfs": {
+   "build": "nr128_fsfs_k0",
+   "date": "2026-11-11T01:28:22",
+   "host": "reunion",
+   "inputs": {
+    "density": "synthetic.sph",
+    "density_sha256": "71fff1f4e9271b80b62792244b45ad777da781067a45c7a06bee23e4b7be181f",
+    "viscosity": "smooth.visc",
+    "viscosity_sha256": "9a109e046d444cd9dd00f42bd15ea1e6f29b88262abc368d48bf0dcb01ce062d"
+   },
+   "npz": "fortran/smooth_fsfs.npz",
+   "npz_sha256": "ca84e1566b62d84a990144fd8e9cd1131689064717c06d844c3db7f5fa954887",
+   "raw": {
+    "combined_sha256": "0accd72f0da2ed795263d8989a49e5590e4b9a672599a88743747ab21b56b063",
+    "n_files": 319
+   },
+   "seconds": 3.33,
+   "spec": {
+    "bdry": 1,
+    "bdry_bot": 1,
+    "density": "synthetic",
+    "kappaindex": 0,
+    "visc": "smooth"
+   }
+  }
+ },
+ "mpmath_version": "1.3.0",
+ "oracle": {
+  "hager4_full_fsfs": {
+   "cpu_seconds": 8.25,
+   "dps_max": 94,
+   "dps_min": 60,
+   "n_arrays": 46,
+   "npz": "oracle/hager4_full_fsfs.npz",
+   "npz_sha256": "3c303af995c9f57731c2953be3dcfde52a1a39abaf068779c48bbb1f364ffd3d"
+  },
+  "hager4_full_fsfs_cc": {
+   "cpu_seconds": 2.84,
+   "dps_max": 60,
+   "dps_min": 60,
+   "n_arrays": 32,
+   "npz": "oracle/hager4_full_fsfs_cc.npz",
+   "npz_sha256": "a3e686dc72cc4cc441e67261fdbfb0c38bd871ade3f6fdc0687b4126d94d18b9"
+  },
+  "hager4_full_fsns": {
+   "cpu_seconds": 4.04,
+   "dps_max": 68,
+   "dps_min": 60,
+   "n_arrays": 23,
+   "npz": "oracle/hager4_full_fsns.npz",
+   "npz_sha256": "2c5a8a91ae53f87a70354b18e9a8ac7468ab3dc1606bc19311ed634bd4dfa5e7"
+  },
+  "hager4_full_nsfs": {
+   "cpu_seconds": 3.98,
+   "dps_max": 68,
+   "dps_min": 60,
+   "n_arrays": 23,
+   "npz": "oracle/hager4_full_nsfs.npz",
+   "npz_sha256": "49e381e6575923514086a98d62481a00e10847ebf115c35c6ae88706e1bb62bf"
+  },
+  "hager4_full_nsns": {
+   "cpu_seconds": 1.89,
+   "dps_max": 60,
+   "dps_min": 60,
+   "n_arrays": 10,
+   "npz": "oracle/hager4_full_nsns.npz",
+   "npz_sha256": "ab98e8fb1e133e2135d7bbdc5a5277c6cfa19444b6dfc8533fc625cbd6edd23d"
+  },
+  "hager4_full_tala_fsfs": {
+   "cpu_seconds": 4.8,
+   "dps_max": 68,
+   "dps_min": 60,
+   "n_arrays": 31,
+   "npz": "oracle/hager4_full_tala_fsfs.npz",
+   "npz_sha256": "0a86429979a3e754370cf2122eeaa5d5e09998d849f56d18cb6314e0c3de4a45"
+  },
+  "hager4_near_fsfs": {
+   "cpu_seconds": 9.87,
+   "dps_max": 60,
+   "dps_min": 60,
+   "n_arrays": 80,
+   "npz": "oracle/hager4_near_fsfs.npz",
+   "npz_sha256": "4e123c18da3b9115a3b34847870e2055f9554c59fe04191480c89a256231f8a2"
+  },
+  "hager4_noself_hydro_fsfs": {
+   "cpu_seconds": 3.62,
+   "dps_max": 68,
+   "dps_min": 60,
+   "n_arrays": 23,
+   "npz": "oracle/hager4_noself_hydro_fsfs.npz",
+   "npz_sha256": "781cdacc004ad5e7f59f401f78c57fdf9857f62a28a15b917860089b264e0170"
+  },
+  "hager4_noself_uniform_fsfs": {
+   "cpu_seconds": 3.65,
+   "dps_max": 68,
+   "dps_min": 60,
+   "n_arrays": 23,
+   "npz": "oracle/hager4_noself_uniform_fsfs.npz",
+   "npz_sha256": "281e9765ca62e37f575a92c5ff6c3126e8be8ae5310e4b5c25edcdd72cab4977"
+  },
+  "iso_full_fsfs_w": {
+   "cpu_seconds": 3.71,
+   "dps_max": 60,
+   "dps_min": 60,
+   "n_arrays": 20,
+   "npz": "oracle/iso_full_fsfs_w.npz",
+   "npz_sha256": "6b478c725f17fb112851486ae3d6190a9b5d8447cfa409c50f1d2598298cf446"
+  },
+  "layers_cc_fsfs": {
+   "cpu_seconds": 1.78,
+   "dps_max": 60,
+   "dps_min": 60,
+   "n_arrays": 27,
+   "npz": "oracle/layers_cc_fsfs.npz",
+   "npz_sha256": "2ca7ce9132cdd5a29380435c017e60343549c345c9ec39b9eed18878a420edd2"
+  },
+  "layers_cc_tala_fsfs": {
+   "cpu_seconds": 1.81,
+   "dps_max": 60,
+   "dps_min": 60,
+   "n_arrays": 27,
+   "npz": "oracle/layers_cc_tala_fsfs.npz",
+   "npz_sha256": "117c1f8d398b34ec716b41eb65df759cd5b6aff2210626e7131dfa7cf78151af"
+  },
+  "legacy_hager4_fsfs": {
+   "cpu_seconds": 7.65,
+   "dps_max": 68,
+   "dps_min": 60,
+   "n_arrays": 51,
+   "npz": "oracle/legacy_hager4_fsfs.npz",
+   "npz_sha256": "0afa6951d16a98c44057ad2845ffb821897056bd73d43da331560184ec1688a2"
+  },
+  "legacy_hager4_fsfs_tala": {
+   "cpu_seconds": 7.77,
+   "dps_max": 68,
+   "dps_min": 60,
+   "n_arrays": 51,
+   "npz": "oracle/legacy_hager4_fsfs_tala.npz",
+   "npz_sha256": "bf6e7cfa0a08a40152fb07dae694bce1925e9f7e1393724c26a8e31a13b4713c"
+  },
+  "legacy_hager4_nsfs": {
+   "cpu_seconds": 7.76,
+   "dps_max": 68,
+   "dps_min": 60,
+   "n_arrays": 51,
+   "npz": "oracle/legacy_hager4_nsfs.npz",
+   "npz_sha256": "330de40fab143e2e4d01fd00728a553e2f39073e47d7c4d55f39f5245cd0b9ff"
+  },
+  "legacy_ishan257": {
+   "cpu_seconds": 9.48,
+   "dps_max": 68,
+   "dps_min": 60,
+   "n_arrays": 33,
+   "npz": "oracle/legacy_ishan257.npz",
+   "npz_sha256": "f8a3990daf827cc3fb131e95b78b290901a08cd80252a7e8221270cf23951a2f"
+  },
+  "legacy_iso_fsfs": {
+   "cpu_seconds": 7.77,
+   "dps_max": 68,
+   "dps_min": 60,
+   "n_arrays": 51,
+   "npz": "oracle/legacy_iso_fsfs.npz",
+   "npz_sha256": "0bca5e1917ed9378847d8d21644e3d5260f55859902b2bbb39f5bc954155eb46"
+  },
+  "legacy_iso_fsns": {
+   "cpu_seconds": 7.65,
+   "dps_max": 68,
+   "dps_min": 60,
+   "n_arrays": 51,
+   "npz": "oracle/legacy_iso_fsns.npz",
+   "npz_sha256": "1d7d90a812f9ebdf95a52c7328085e3bc54fa6fbcd7f6919708d65087ce24e80"
+  },
+  "legacy_iso_nsfs": {
+   "cpu_seconds": 7.66,
+   "dps_max": 68,
+   "dps_min": 60,
+   "n_arrays": 51,
+   "npz": "oracle/legacy_iso_nsfs.npz",
+   "npz_sha256": "0bfef22331b67dd37876a20ad174645f3e638d978063fef67ef6285f9019db82"
+  },
+  "legacy_smooth_fsfs": {
+   "cpu_seconds": 7.73,
+   "dps_max": 68,
+   "dps_min": 60,
+   "n_arrays": 51,
+   "npz": "oracle/legacy_smooth_fsfs.npz",
+   "npz_sha256": "3c9f51576a461182b675026bf565d112e40c5397a026862e9b89813195c0be5e"
+  },
+  "prem_incomp_fsfs": {
+   "cpu_seconds": 5.04,
+   "dps_max": 68,
+   "dps_min": 60,
+   "n_arrays": 31,
+   "npz": "oracle/prem_incomp_fsfs.npz",
+   "npz_sha256": "77387c667d02f998f48dbd359e893504de3e852f4c8487332885f596b040f548"
+  },
+  "prem_tala_fsfs": {
+   "cpu_seconds": 5.11,
+   "dps_max": 68,
+   "dps_min": 60,
+   "n_arrays": 31,
+   "npz": "oracle/prem_tala_fsfs.npz",
+   "npz_sha256": "f52d69fa40d01765573da6b80e096d6b20ccd914d48909a68c31727f99ab0e88"
+  },
+  "prem_tala_fsfs_material": {
+   "cpu_seconds": 1.89,
+   "dps_max": 60,
+   "dps_min": 60,
+   "n_arrays": 10,
+   "npz": "oracle/prem_tala_fsfs_material.npz",
+   "npz_sha256": "80120bbbe61877883d17deebd706494fc679ad8d7c5db2c2b675c7396d31654f"
+  },
+  "prem_tala_narrow": {
+   "cpu_seconds": 5.92,
+   "dps_max": 60,
+   "dps_min": 60,
+   "n_arrays": 30,
+   "npz": "oracle/prem_tala_narrow.npz",
+   "npz_sha256": "d3e6b24ec0dca1ea4450c209afbabfd7566e6e241bf4c213d6f700a3476133a8"
+  },
+  "smooth_conv": {
+   "cpu_seconds": 19.43,
+   "dps_max": 60,
+   "dps_min": 60,
+   "n_arrays": 72,
+   "npz": "oracle/smooth_conv.npz",
+   "npz_sha256": "f7b76e87de65f0ef8e79241e7b0a8fb42bef674770e00b3748062ae7568237a8"
+  },
+  "uniform_cc_full_fsfs": {
+   "cpu_seconds": 3.46,
+   "dps_max": 60,
+   "dps_min": 60,
+   "n_arrays": 54,
+   "npz": "oracle/uniform_cc_full_fsfs.npz",
+   "npz_sha256": "f392629e6ef5c2f25f4d47adbb1155043141a07272225db5e061c71e2370d1fb"
+  },
+  "wide5_full_fsfs": {
+   "cpu_seconds": 4.41,
+   "dps_max": 94,
+   "dps_min": 60,
+   "n_arrays": 20,
+   "npz": "oracle/wide5_full_fsfs.npz",
+   "npz_sha256": "ac6f4c68818a699f9f356444295919de409937d608172bedc4eb0699256ca461"
+  }
+ },
+ "reference_mpmath_py_sha256": "c8dc835a36b4680c2e1995f397951e6a91b54dc548b59246312caf4b3ef9af2b",
+ "source": {
+  "path": "~/Workplace/geoid_semianl/CODE-A",
+  "sha256": {
+   "CODE/SRC/calc.f": "f06f44d035aca47d94a3b2f12abe41da155c406d346515a2c6a6f0e3021bce6c",
+   "CODE/SRC/commpi.f90": "17c0ef719cc77bd464aaa59a1fc246a68e4cd89e1a370fad47b16e0307d0c2a2",
+   "CODE/SRC/constants.f90": "5fbc265c94c6775b90691de14c4fff5a76830e60bc111b2447627ece05057a1f",
+   "CODE/SRC/constants.h": "00032d5e9055916ed1f0140a66e9feefcdeaa35f90f6724e96b4b353b985ece5",
+   "CODE/SRC/driver.f": "f6d4cae1a44c56fb64677a7f3989fc434f85c8d08e7bc8907effe84d9f242bb9",
+   "CODE/SRC/linpack_q.f90": "efb707b5564b5c823e90c919ccf278af8e4fbecf77281ac3db37d6847f90c507",
+   "CODE/SRC/matrix.f": "7af92a6fa31273009b121b4bef6d7a044afa1bc756d2db7830baf0414260e794",
+   "CODE/SRC/ref_flds.f90": "44613afe8ace7239c95a9753ce18e02c34a425ccfb2896b48ff71ef03a16833f",
+   "CODE/SRC/sph_tools.f90": "32a3ae1378d99b39e5a4495a16d6a831694ddda5816b6effb100200efcc862d3",
+   "CODE/SRC/util.f90": "a6515e68bc41af08d6dd0818ae8d5802b04f09f702cfa57ba81df564fa881e7d",
+   "CODE/SRC_POWELL/brent.f90": "ad899782cb5ac65f82bbf863aee787219a9644cad0c1a5f7fa31e53c2b123b9b",
+   "CODE/SRC_POWELL/inversion.f90": "711bebbaa92fa8485a03b67c7c9d1f5e6988bd28e05a6ce5a7508acf4c34fd27",
+   "CODE/SRC_POWELL/linmin.f90": "4771c92255ff84e6de34de8999c8a56385ac7f2f17852aa1b6b392f157f72a52",
+   "CODE/SRC_POWELL/mnbrak.f90": "3fd78b97df213824965d333c0c88053de178734a481afd68bb962c17c2ff8f06",
+   "CODE/SRC_POWELL/nr.f90": "7b55a88419312a3ce1a67e40d1c2920db14c93553869a7fde16b4d96f905da9c",
+   "CODE/SRC_POWELL/nrtype.f90": "3167a655fb11c2622ae97814d6531a2e775d7bf2e1cd2ce71321b41208d4e9fb",
+   "CODE/SRC_POWELL/nrutil.f90": "e34bbc79e05c0085d061072462450faa4e2aa56a134441ea2edd75b6b68e4b4a",
+   "CODE/SRC_POWELL/powell.f90": "f64fbb62633fec99f4ecf18ef1d05097bce5c286fdfcc59090d6cd97a7c18b9a",
+   "CODE/SRC_SHTOOLS/PLegendreA.f95": "b594e5c7de777fee6272da5b10b5d4acce6ef220616c3a848f7be6936ee253fe",
+   "CODE/SRC_SHTOOLS/SHTOOLS.f95": "7b240e98dc74e15102709eb511cadb8ece826c43155acc1cbeda99a511b2c309",
+   "Hager_4Layer_Flip.visc": "b24c6e17bf0d653e6a436f652f29075d545c8ce91e222523b3efeaef6d864dcd",
+   "INPUT/DENSITY_INPUTS/LEBEDEV_S4RTS.sph": "ba0f0c8f59f697adc2a7e92bc3fc9d6db116e85477da4f7b6d750fa91b3c52ec",
+   "INPUT/RefGeo/Hoggard_et_al_reformulated.gfc": "9cb52a85ac8ceac0ee95f67e68396b34dd3e024cac06356a2e916b9ffeff886f",
+   "INPUT/RefGeo/Koelemeijer_2017_cmb.sph": "4e211e077e744ec3167b9a5dfc2e40f304373402c2574c709892a7a8ac9bbbf1",
+   "INPUT/RefGeo/eigen5c2": "e6bdba9ce8ab394b903cf170879a765ba6ebe4cfeb27aa606534453799b9a941"
+  }
+ },
+ "toolchain": {
+  "host": "reunion",
+  "machine": "arm64",
+  "mpif90_showme": "gfortran -I/opt/homebrew/Cellar/open-mpi/5.0.10/include -Wl,-flat_namespace -I/opt/homebrew/Cellar/open-mpi/5.0.10/lib -L/opt/homebrew/Cellar/open-mpi/5.0.10/lib -lmpi_usempif08 -lmpi_usempi_ignore_tkr -lmpi_mpifh -lmpi",
+  "mpif90_version": "GNU Fortran (Homebrew GCC 16.2.0) 16.2.0",
+  "openblas_library": [
+   "libopenblasp-r0.3.34.dylib"
+  ],
+  "openblas_path": "/opt/homebrew/opt/openblas/lib",
+  "openblas_version": "",
+  "system": "macOS-26.6.2-arm64-arm-64bit"
+ }
+}

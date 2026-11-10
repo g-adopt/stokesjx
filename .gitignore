@@ -1,0 +1,26 @@
+# Working notes: the private research record (plans, hand-offs, findings,
+# benchmark scratch). Never committed.
+NOTES/
+
+# The Fortran reference CODE-A, its build tree and its raw output. Regenerable
+# from the read-only original with legacy/harness/run_golden.py; the tracked
+# reduction lives in tests/golden/ with a sha256 manifest.
+legacy/
+
+# Raw Fortran output, if a harness run writes it beside the tracked golden data.
+tests/golden/raw/
+
+# Python build and cache artefacts.
+__pycache__/
+*.egg-info/
+.pytest_cache/
+build/
+dist/
+
+# Fortran build artefacts.
+*.o
+*.mod
+*.a
+
+# Generated CI reports and plots.
+artifacts/
