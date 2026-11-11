@@ -296,7 +296,17 @@ def integrate_gravity(radius, rho0, core_mass, units: Units) -> jax.Array:
 
 def mantle_mass(radius, rho0, units: Units) -> jax.Array:
     """Mass of the mantle in kg (scalar): the sum of the interval shells of
-    ``integrate_gravity``. It enters ``M_eff`` of the degree-one imbalance (eq. 10.6)."""
+    ``integrate_gravity``. It enters ``M_eff`` of the degree-one imbalance (eq. 10.6).
+
+    Parameters
+    ----------
+    radius
+        ``(N,)`` node radii in m, CMB first.
+    rho0
+        ``(N,)`` reference density in kg/m^3.
+    units
+        ``Units`` (``pi`` of the shell volumes).
+    """
     radius = jnp.asarray(radius, dtype=jnp.float64)
     rho0 = jnp.asarray(rho0, dtype=jnp.float64)
     return jnp.sum(_shell_masses(radius, rho0, units))
@@ -444,7 +454,15 @@ class RadialProfile:
         """A profile with the same structure and some leaves replaced, for example
         ``p.replace(eta=jnp.exp(log_eta))``. The new leaves can be traced. A change of
         ``core_mass`` between ``None`` and a number changes the core model, which the
-        structure fixes, and raises ``ValueError``."""
+        structure fixes, and raises ``ValueError``.
+
+        Parameters
+        ----------
+        **arrays
+            New values by leaf name (``radius``, ``rho0``, ``eta``, ``core_density``,
+            ``core_mass``, ``outer_density``, ``surface_density``, ``uniform_gravity``,
+            ``cut_radius``); another name raises ``TypeError``.
+        """
         kw = {k: getattr(self, k) for k in _LEAF_NAMES}
         unknown = set(arrays) - set(kw)
         if unknown:
@@ -461,13 +479,14 @@ class RadialProfile:
 
     def effective_core_mass(self, units: Units) -> jax.Array:
         """Core mass in kg in the gravity integral: ``core_mass``, or the consistent
-        value ``(4 pi / 3) r_c^3 rho_c`` for ``core_mass=None``."""
+        value ``(4 pi / 3) r_c^3 rho_c`` for ``core_mass=None``; ``units`` gives ``pi``."""
         if self.core_mass is None:
             return consistent_core_mass(self.radius[0], self.core_density, units)
         return self.core_mass
 
     def hydrostatic_gravity(self, units: Units) -> jax.Array:
-        """Hydrostatic gravity at the nodes, m/s^2, ``(N,)`` (eq. 6.1, ``integrate_gravity``)."""
+        """Hydrostatic gravity at the nodes, m/s^2, ``(N,)`` (eq. 6.1, ``integrate_gravity``),
+        with ``G`` and ``pi`` of ``units``."""
         return integrate_gravity(self.radius, self.rho0, self.effective_core_mass(units), units)
 
     def __repr__(self):
@@ -478,7 +497,7 @@ class RadialProfile:
 #: The leaves of a profile, in pytree order. ``uniform_gravity`` is the eighth child and
 #: ``cut_radius`` the ninth: ``None`` is an empty subtree, so a profile without them has
 #: seven array leaves, and a profile without a cut has the tree definition of a profile
-#: built before the cut existed.
+#: whose structure has no ``cuts`` field.
 _LEAF_NAMES = ("radius", "rho0", "eta", "core_density", "core_mass", "outer_density", "surface_density",
                "uniform_gravity", "cut_radius")
 

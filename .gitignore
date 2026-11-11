@@ -24,3 +24,6 @@ dist/
 
 # Generated CI reports and plots.
 artifacts/
+
+# The outputs of the scripts in examples/ (their default --out).
+examples/output/

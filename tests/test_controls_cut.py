@@ -65,8 +65,13 @@ J2 = 5970e3                 # the 400 km density-jump pair
 # ---------------------------------------------------------------------------
 # The cut against the package solver on a concrete reference table of 9.0 (swapped pair,
 # node split, pair at J under FULL, geometric pair), e_l: two solves of the same
-# discrete model, rounding only (measured 2.1e-14).
-CUT_SWAP_TOL = 1e-13
+# discrete model, rounding only. Measured 2.1e-14 typical, 5.4e-14 on reunion at the test
+# settings (FJ2, NO_SELF_GRAVITY) and 6.9e-14 at lmax = 200
+# (NOTES/chunks/c4b-boundaries-across-jumps/04-review-physics-r1.md, minor 3). The
+# rounding of two independent float64 solves depends on the CPU and the LAPACK build, and
+# the tests run on HPC runners (NOTES/PLAN.md ruling 12), so the constant keeps a factor
+# of about 5 above the largest measured value; no failing measurement exists.
+CUT_SWAP_TOL = 3e-13
 # The same with a viscosity contrast of 1e6 across the cut (measured 5.2e-13 at lmax 50,
 # 4.1e-13 at lmax 100): the rounding of the similarity grows with the contrast.
 CUT_SWAP_TOL_CONTRAST = 2e-12
@@ -132,6 +137,9 @@ LAYOUTS = {
     "FJ1x": (True, B_FJ1X, {2: (5466.875e3, 5970e3)}, ETA_FJ1X),
     "T3full": (False, np.array([3480, 5700, 5970, 6270, 6370]) * KM, {1: (5466.875e3, 5970e3)}, ETA_FJ1),
     "T4full": (False, B_FJ2, {1: (5466.875e3, 6150e3)}, ETA_FJ2),
+    # V10: a cut range that holds the viscosity-only pair of the input at 6270 km and ends
+    # at the surface (motion="cut" explicitly: the range holds no density jump).
+    "FV": (True, np.array([3480, 5970, 6250, 6370]) * KM, {2: (6150e3, 6370e3)}, np.array([1e22, 3e20, 1e23])),
 }
 
 FORMS = {
@@ -537,7 +545,8 @@ def _primitive_names(jaxpr) -> list[str]:
 
 def test_c11_loop_free():
     """C11: the call (its gradient) has no scan, while or cond; the core of a cut profile
-    has as many scans as the core of the same table without cuts (the two sweeps)."""
+    has as many scans as the core of the same table without cuts (the two sweeps), and no
+    while or cond primitive."""
     L, B, eta = layers("FJ3")
 
     def f(b, le):
@@ -553,7 +562,9 @@ def test_c11_loop_free():
     for prof in (q, plain):
         plan = propagate.static_plan(prof.structure, cfg)
         jx = jax.make_jaxpr(lambda p: propagate._core(p, plan, cfg, "largest"))(prof)
-        counts.append(_primitive_names(jx.jaxpr).count("scan"))
+        names = _primitive_names(jx.jaxpr)
+        counts.append(names.count("scan"))
+        assert not {"while", "cond"} & set(names), set(names)
     assert counts == [2, 2], counts
 
 
@@ -909,11 +920,17 @@ def test_k3_one_sided_differences_at_r0():
 # the base point leaves a residual of 1 % of the field there, and a 1 % bias of the
 # derivative then hides below the second-order remainder at the judged steps (the 1.01
 # control passes). The quadratic misfit is used in place of the linear functional of
-# chunk 4 (``Program``) because the cut map is C1 and not C2 at a density pair (the
-# second derivative of the kernels jumps with the interval density): for the linear
-# functional that jump dominates the corrected remainder of a base point 20 m below J
-# (T29), while the misfit's second derivative is dominated by the Gauss-Newton part
-# ``|dN/dc|^2``, which is continuous (impl-evidence/taylor_functional.out).
+# chunk 4 (``Program``) because the cut map is C1 and not C2 where the cut crosses an
+# input node: under an incompressible formulation the second derivative of the kernels
+# jumps at every input node that the cut crosses (the kernel of the crossed node holds
+# ``(A(e_lo) - A(e_hi)) A J``; the interval density adds a smaller term where it changes;
+# measured 0.9 of the kernel of the crossed node, 0.07 to 0.15 of the geoid field of a
+# smooth density on the 137-node table and 0.47 on the 25-node table,
+# NOTES/chunks/c4b-boundaries-across-jumps/04-review-physics-r1.md section 3.4). For the
+# linear functional that jump dominates the corrected remainder of a base point 20 m below
+# J (T29), while the misfit's second derivative is dominated by the Gauss-Newton part
+# ``|dN/dc|^2``, which is continuous (impl-evidence/taylor_functional.out). The rows T28L,
+# T31L and T32L below run the linear functional where the ladder crosses no node.
 TARGET_RADII = {"FJ1": (5520e3,), "FJ2": (5880e3,), "FJ3": (5520e3, 6080e3), "T3full": (5520e3,),
                 "T4full": (5880e3,)}
 TARGET_MIN_DISTANCE = 50e3
@@ -1062,6 +1079,63 @@ def test_dp4_dot_products(case):
     dx = dict(radii=dr, log_eta=rng.standard_normal(c0["log_eta"].size), rho0=50.0 * rng.standard_normal(L.n_nodes))
     rel = assert_jvp_vjp(prog.dot, base, dx=dx, dy=prog.cotangent(42), rtol=DOT_RTOL)
     print(f"DP4 {case}: {rel:.2e}")
+
+
+LINEAR_TAYLOR_CASES = {
+    # case: (layout, base radius); the ladder of each case crosses no input node on either
+    # side, so the linear functional is smooth along it (c4b review minors, JAX 1 and
+    # physics 2: the topographies and the velocity get a Taylor row).
+    "T28L": ("FJ1", J),
+    "T31L": ("FJ1", 5647.5e3),
+    "T32L": ("FJ1", None),
+}
+
+
+@pytest.mark.parametrize("case", list(LINEAR_TAYLOR_CASES))
+def test_taylor_radius_linear(case):
+    """T28L, T31L, T32L: the linear four-output functional of chunk 4 (``Program``: the
+    four kernels and the four fields of ``Layers.fields`` with fixed random weights) along
+    the movable radius (5000 m), both signs, both modes, the 1.01 controls failing; FULL,
+    at J, at an input node and in the middle of the interval above J (the T32 point)."""
+    name, x = LINEAR_TAYLOR_CASES[case]
+    prog, c0 = program(name, "default", 20)
+    L, B, _ = layers(name)
+    if x is None:
+        x = tala_base(name)
+    tca.assert_taylor_with_controls(prog, base_at(c0, B, L, x), radius_direction(c0, L))
+
+
+def test_v10_viscosity_pair_and_surface():
+    """V10 (c4b physics minor 4): a cut range that holds the viscosity-only pair of the
+    input at 6270 km and ends at the surface (layout FV, ``motion="cut"``). FULL against
+    the swapped-pair table at positions between nodes and at both clamp bounds; TALA on
+    the pair against the public oracle on the triple-up table; under TALA the kernels
+    change by less than ``TIE_SIDE_TOL`` over 1 mm below the pair (nothing jumps at a
+    pair with equal ``rho0``), and the warning is issued."""
+    L, B, eta = layers("FV", "cut")
+    assert L.motion == "cut" and L.ranges[2].density_jumps == ()
+    lo, hi = L.radius_bounds[0]
+    T = ref_input("FV")
+    f_full, _ = kernel_fn("FV", "default", 20, "cut")
+    worst = 0.0
+    for x in (6200e3, 6270e3 - 1.0, 6270e3 + 1.0, 6300e3, lo, hi):
+        K = {o: np.asarray(v) for o, v in f_full(jnp.array([x])).items()}
+        ref, keep = rc.swapped_pair_table(T, boundaries_at("FV", x), eta, (2,))
+        worst = max(worst, worst_el(K, package_on(ref, "default", 20, keep)))
+    print(f"V10 FULL against the swapped-pair table: {worst:.2e}")
+    assert worst <= CUT_SWAP_TOL
+    f_tala, _ = kernel_fn("FV", "tala", 10, "cut")
+    Kp = {o: np.asarray(v) for o, v in f_tala(jnp.array([6270e3])).items()}
+    Km = {o: np.asarray(v) for o, v in f_tala(jnp.array([6270e3 - 1e-3])).items()}
+    e = worst_el(rows(Kp, ORACLE_DEGREES, degrees_of(10, "tala")), oracle_on("FV", "tala", 6270e3, "triple_up"))
+    print(f"V10 TALA on the pair against the oracle on the triple-up table: {e:.2e}")
+    assert e <= ORACLE_TOL
+    e = worst_el(Km, Kp)
+    print(f"V10 TALA K(6270 km - 1 mm) against K(6270 km): {e:.2e}")
+    assert e <= TIE_SIDE_TOL
+    q = L(boundaries_at("FV", 6270e3), np.log(eta))
+    with pytest.warns(RuntimeWarning, match="density jump"):
+        sj.stokes_kernels(q, sj.StokesConfig(lmax=4, formulation=FORMS["tala"]))
 
 
 @functools.lru_cache(maxsize=None)

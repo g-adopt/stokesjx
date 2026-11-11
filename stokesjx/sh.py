@@ -238,6 +238,14 @@ def analysis(grid: GaussLegendreGrid, field) -> jax.Array:
     orders) in longitude; ``1 / (2 nlon)`` is ``1 / 4 pi`` times the longitude spacing.
     The real and imaginary parts are contracted separately against the real table, so
     that the table is never promoted to complex.
+
+    Parameters
+    ----------
+    grid
+        ``GaussLegendreGrid`` (latitude nodes and weights, the Legendre table, ``nlon`` and
+        the truncation ``ntrunc = L``).
+    field
+        ``(nlat, nlon)`` real values on the grid.
     """
     L, nlon = grid.ntrunc, grid.nlon
     am = jnp.fft.rfft(field, axis=1) / nlon                      # (nlat, nlon // 2 + 1)
@@ -283,6 +291,13 @@ def check_layout(coefficients, convention: str) -> None:
 
     A real convention needs a real dtype and the ``C/S`` axis of length 2 at ``-3``; the
     complex convention needs at least two axes. In both the last two axes are square.
+
+    Parameters
+    ----------
+    coefficients
+        The array to check (only its shape and dtype are read).
+    convention
+        A name from ``CONVENTIONS``.
     """
     if convention not in CONVENTIONS:
         raise ValueError(f"unknown convention {convention!r}; use one of {CONVENTIONS}")

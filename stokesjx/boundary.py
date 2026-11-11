@@ -103,6 +103,13 @@ def surface_potential_coefficient(degrees, frame: DegreeOneFrame | None) -> np.n
     raw row minus ``(2l + 1) y5``, so the exchange is one static number (CONVENTIONS 5).
     The row holds under both gravity levels: the potential at the surface is that of
     the load and of the deflected boundaries in both (eq. 5.2).
+
+    Parameters
+    ----------
+    degrees
+        The static degrees of the kernel rows.
+    frame
+        The resolved degree-1 frame, or ``None`` without degree 1.
     """
     l = np.asarray(degrees, dtype=np.float64)
     a = l + 1.0
@@ -216,6 +223,12 @@ def cmb_functional(*, r_c, g_c, rho_cmb, rho_c, rho_s, eta_ref, terms: Terms) ->
     kg/m^2, outward positive. The state is the one just above the CMB deflection
     (below a sheet at the CMB node). ``rho_c phi`` is the pressure of the core in the
     perturbed potential, a self-gravity term (eq. 5.2).
+
+    Parameters (keywords): ``r_c`` the CMB radius in m; ``g_c`` the background gravity at
+    the CMB, m/s^2; ``rho_cmb`` the mantle ``rho0`` at the CMB and ``rho_c`` the core
+    density, kg/m^3; ``rho_s`` the density scale of the state, kg/m^3; ``eta_ref`` the
+    viscosity scale, Pa s; ``terms`` the static ``Terms`` (``self_gravity`` selects the
+    core-pressure term).
     """
     den = (rho_cmb - rho_c) * g_c
     row = (-(eta_ref / r_c) / den) * _unit(2)

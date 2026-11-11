@@ -1,9 +1,11 @@
 """Physical constants and the density scale of the state vector.
 
 Two things live here: the values of the physical constants that enter the
-solver (the gravitational constant ``G``, ``pi`` and the mass of the Earth for the
-free-air conversion of a later chunk), and the density scale ``rho_s`` of the state
-vector (NOTES/docs/equations.md, eq. 3.1).
+solver (the gravitational constant ``G``, ``pi`` and the mass of the Earth), and the
+density scale ``rho_s`` of the state vector (NOTES/docs/equations.md, eq. 3.1). The mass
+of the Earth enters only CODE-A's free-air kernel, which a legacy test evaluates
+(``tests/test_fields.py::test_gravity_anomaly_against_fortran``); the package takes the
+surface gravity of a free-air anomaly from the profile (``fields.surface_gravity``).
 
 There is no length scale and no viscosity scale. The radius comes from the node table
 of the profile in metres, and the viscosity scale of the state is internal to the

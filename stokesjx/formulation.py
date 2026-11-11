@@ -154,7 +154,11 @@ class BoundaryCondition(abc.ABC):
     @abc.abstractmethod
     def tangential_unknown(self, radius, eta_ref, side: int, parameter=None) -> tuple:
         """The free tangential direction ``a e2 + b e4`` of the state at the boundary,
-        as ``(a, b)``. See the class docstring for the arguments."""
+        as ``(a, b)``.
+
+        Parameters (class docstring): ``radius`` the boundary radius in m, ``eta_ref`` the
+        viscosity scale ``eta_s`` in Pa s, ``side`` +1 at the surface and -1 at the CMB,
+        ``parameter`` ``None`` or a traced boundary parameter."""
 
 
 @dataclass(frozen=True)
@@ -168,7 +172,9 @@ class FreeSlip(BoundaryCondition):
 
     def tangential_unknown(self, radius, eta_ref, side: int, parameter=None) -> tuple:
         """``(1.0, 0.0)``: the direction ``e2``, as Python floats for every argument, so
-        that the boundary basis stays a static coefficient array."""
+        that the boundary basis stays a static coefficient array. The arguments
+        ``radius``, ``eta_ref``, ``side`` and ``parameter`` (``BoundaryCondition``) are not
+        read."""
         return 1.0, 0.0
 
 
@@ -183,7 +189,9 @@ class NoSlip(BoundaryCondition):
     traction_free: ClassVar[bool] = False
 
     def tangential_unknown(self, radius, eta_ref, side: int, parameter=None) -> tuple:
-        """``(0.0, 1.0)``: the direction ``e4``, as Python floats for every argument."""
+        """``(0.0, 1.0)``: the direction ``e4``, as Python floats for every argument. The
+        arguments ``radius``, ``eta_ref``, ``side`` and ``parameter``
+        (``BoundaryCondition``) are not read."""
         return 0.0, 1.0
 
 
@@ -239,8 +247,12 @@ class Formulation:
         density jump, the ``h -> 0`` limit of the interval step. The other reading
         (``u_r`` continuous, the "material" rule) changes the PREM TALA geoid kernel
         by up to 18 % at ``l = 2`` and the topographies by 2 % (equations.md section
-        12, test_pair_rule_size of the oracle). The choice is open with the owner
-        (question Q6); the package implements the anelastic rule only.
+        12, test_pair_rule_size of the oracle). The package implements the anelastic rule
+        only. The density jumps of ``rho0`` in the mantle are phase changes: the material
+        crosses them, so the mass flux ``rho0 u_r`` is continuous and ``u_r`` jumps by the
+        inverse ratio of the two densities (eq. 12.3). The "material" rule is the rule of a
+        chemical boundary, which the material does not cross; the package does not
+        implement it, and the mpmath oracle evaluates it only for ``test_pair_rule_size``.
     surface, cmb
         Boundary class at each boundary, ``FreeSlip()`` (default) or ``NoSlip()``
         (``BoundaryCondition``).
@@ -339,6 +351,20 @@ def degree_one_options(formulation: Formulation, consistent_core: bool) -> Frame
       request for a split core;
     - NO_SELF_GRAVITY or a uniform background: a background field takes the net
       force, raw only (lovejx anchor convention).
+
+    Parameters
+    ----------
+    formulation
+        The ``Formulation`` (static).
+    consistent_core
+        ``True`` for a consistent core (``core_mass is None``), ``False`` for a split core.
+
+    Parameters
+    ----------
+    formulation
+        The ``Formulation`` (static).
+    consistent_core
+        ``True`` for a consistent core (``core_mass is None``), ``False`` for a split core.
     """
     free_body = formulation.gravity is GravityModel.FULL and isinstance(formulation.background, Hydrostatic)
     both_free = formulation.surface.traction_free and formulation.cmb.traction_free
@@ -366,6 +392,15 @@ def resolve_degree_one(formulation: Formulation, consistent_core: bool,
     does not offer raises ``ValueError``: for example raw on a consistent core under
     FULL with hydrostatic gravity and free slip, where the float64 solve of the
     singular system would return finite wrong numbers without an error.
+
+    Parameters
+    ----------
+    formulation
+        The ``Formulation`` (static).
+    consistent_core
+        ``True`` for a consistent core (``core_mass is None``).
+    request
+        The requested ``DegreeOneFrame``.
     """
     opts = degree_one_options(formulation, consistent_core)
     if request is DegreeOneFrame.DEFAULT:

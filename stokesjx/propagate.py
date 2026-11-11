@@ -133,8 +133,8 @@ class StaticPlan:
         the kernels then jump when the cut crosses a pair with a density jump, and
         ``solve`` warns on every call. The structure holds no ``rho0``, so the field is
         also ``True`` for a viscosity-only pair, where nothing jumps. The last field, with
-        the default ``False``: the plan of every structure without cuts compares and
-        hashes as before, and the field does not enter the jitted core.
+        the default ``False``, so that the plan of a structure without cuts compares and
+        hashes as a plan without this field; the field does not enter the jitted core.
     """
 
     degrees: tuple[int, ...]
@@ -292,7 +292,17 @@ def background_gravity(profile: RadialProfile, formulation: Formulation, units: 
     core mass (eq. 6.1) or uniform (eq. 6.2). Evaluated inside the differentiated
     function, so it follows ``rho0``, the radius and the core under ``jax.grad``. The
     uniform value is the static ``Uniform.value``, or for ``Uniform(None)`` the profile
-    leaf ``uniform_gravity``, which can be traced (a control ``g0``)."""
+    leaf ``uniform_gravity``, which can be traced (a control ``g0``).
+
+    Parameters
+    ----------
+    profile
+        ``RadialProfile``.
+    formulation
+        ``Formulation``: its ``background`` selects the rule.
+    units
+        ``Units`` (``G`` and ``pi`` of the hydrostatic integral).
+    """
     if isinstance(formulation.background, Hydrostatic):
         return profile.hydrostatic_gravity(units)
     if isinstance(formulation.background, Uniform):
@@ -339,6 +349,17 @@ def interval_steps(profile: RadialProfile, eta_ref, plan: StaticPlan,
     viscosity is not used). The sweeps, the node solve and the outputs do not change.
     The fractions are at most ``1 + 2 eps``, so the sub-exponents stay inside the static
     Pade bound of their interval, and ``f_lo + f_hi = 1`` up to rounding.
+
+    Parameters
+    ----------
+    profile
+        ``RadialProfile`` (the radius, ``rho0``, ``eta`` and ``cut_radius`` can be traced).
+    eta_ref
+        The viscosity scale ``eta_s`` of the state, Pa s.
+    plan
+        The ``StaticPlan`` (degrees, Pade plan, material and TALA rules).
+    config
+        ``StokesConfig``: the density scale ``rho_s`` of ``config.units``.
     """
     rho_s = config.units.density_scale
     structure = profile.structure
@@ -583,6 +604,15 @@ def check_profile(profile: RadialProfile, plan: StaticPlan, config: StokesConfig
     structure when the radius is traced).
 
     Each check runs when the leaves that it reads are concrete (``_concrete_leaves``).
+
+    Parameters
+    ----------
+    profile
+        ``RadialProfile`` (concrete or partly traced).
+    plan
+        The ``StaticPlan`` of the structure and the config.
+    config
+        ``StokesConfig``: the flags and the limits of ``Numerics``.
     """
     # The uniform-gravity leaf and the flag go together. The test reads only whether
     # the leaf is None, which is pytree structure and so static: it runs under a trace.
@@ -663,7 +693,7 @@ def check_profile(profile: RadialProfile, plan: StaticPlan, config: StokesConfig
 
 
 def solve(profile: RadialProfile, config: StokesConfig, discretisation: Discretisation = Discretisation(),
-          *, _reference_viscosity: float | str = "largest") -> Kernels:
+          *, _reference_viscosity: float | str = "largest", _warn_stacklevel: int = 2) -> Kernels:
     """The kernels of a profile (low-layer entry; ``kernels.stokes_kernels`` calls it with
     the default discretisation).
 
@@ -678,6 +708,10 @@ def solve(profile: RadialProfile, config: StokesConfig, discretisation: Discreti
     _reference_viscosity
         Private hook of the tests: the viscosity scale rule of ``reference_viscosity``.
         It selects a static branch of the jitted core.
+    _warn_stacklevel
+        Private: the ``stacklevel`` of the TALA warning below. 2 names the caller of this
+        function; ``kernels.stokes_kernels`` passes 3, so that the warning names the line
+        of the caller of ``stokes_kernels``.
 
     Returns
     -------
@@ -689,15 +723,16 @@ def solve(profile: RadialProfile, config: StokesConfig, discretisation: Discreti
 
     Warning: a ``RuntimeWarning`` (``TALA_CUT_WARNING``) on every call when the plan has
     ``tala_cut_across_pair`` (TALA, and a jump pair strictly inside the range of a
-    viscosity cut). Under an outer ``jax.jit`` this function runs once per trace, so the
-    warning comes once per trace; the default filter of Python shows it once per call
-    site.
+    viscosity cut). The warning names the line of the user's call (``_warn_stacklevel``).
+    Under an outer ``jax.jit`` this function runs once per trace, so the warning comes
+    once per trace; the default filter of Python shows it once per call site of the
+    user.
     """
     if not isinstance(profile, RadialProfile):
         raise TypeError(f"profile must be a RadialProfile, got {type(profile).__name__}")
     plan = static_plan(profile.structure, config, discretisation)
     if plan.tala_cut_across_pair:
-        warnings.warn(TALA_CUT_WARNING, RuntimeWarning, stacklevel=2)
+        warnings.warn(TALA_CUT_WARNING, RuntimeWarning, stacklevel=_warn_stacklevel)
     check_profile(profile, plan, config)
     out = _core_jit(profile, plan, config, _reference_viscosity)
     return Kernels(degrees=plan.degrees, degree_one_frame=plan.frame, radius=profile.radius, **out)

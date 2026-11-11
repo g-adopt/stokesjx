@@ -164,10 +164,10 @@ class Layers:
     holds a density-jump pair of the input strictly inside, ``"affine"`` otherwise.
     ``Layers.motion`` holds the resolved method (``None`` without a movable boundary).
     Under ``"auto"`` every layering whose ranges hold no density jump runs the affine
-    method bit for bit as before the cut existed; making ``"cut"`` the default for every
-    range is an open owner question (NOTES/chunks/c4b-boundaries-across-jumps/01-plan.md
-    Q1): on the ranges without a density jump the cut removes every kink of the affine
-    method and is as fast.
+    method. ``motion="cut"`` is accepted for every movable range: on a range without a
+    density jump, under an incompressible formulation, the cut removes every kink of the
+    affine method and is as fast (NOTES/chunks/c4b-boundaries-across-jumps/01-plan.md
+    section 2.2).
 
     **The affine method.** Inside the range, with the construction radius ``r0`` and
     the new radius ``r``, the nodes below the pair map affinely from ``[low, r0]`` onto
@@ -234,8 +234,16 @@ class Layers:
 
     Derivative of the cut: under an incompressible formulation the map from ``c`` to every
     output is continuously differentiable everywhere, also where the cut crosses an
-    input node or a density pair (proof in NOTES/docs/equations.md section 19.3; the
-    second derivative jumps at a density pair). Measured: the relative jump of the
+    input node or a density pair (proof in NOTES/docs/equations.md section 19.3). The map
+    is not twice continuously differentiable: its second derivative jumps where the cut
+    crosses any input node (the second derivative of the kernel of the crossed node
+    holds ``(A(e_lo) - A(e_hi)) A J``, which is not zero; the interval density adds a
+    smaller term where it changes). Measured jumps of the second derivative: 0.9 of the
+    kernel of the crossed node, and 0.07 to 0.15 of the geoid field of a smooth density
+    on the 137-node table (0.47 on the 25-node table); the estimated energy error of one
+    such jump for a leapfrog step of ``sigma_r = 10`` km is about 2e-3 nat
+    (NOTES/chunks/c4b-boundaries-across-jumps/04-review-physics-r1.md section 3.4).
+    The numbers that follow are for the first derivative. Measured: the relative jump of the
     derivative of the geoid field at most 5e-10 at every crossing of four tables (the
     rounding of the extrapolation; the chunk 4 tables T1 and T2 and two ranges across
     the 670 km and 400 km density jumps, smooth, LEBEDEV and rough anomaly), and the
@@ -281,7 +289,7 @@ class Layers:
       and the derivative jump at the pair) add ``E_rms`` up to 0.04 nat at a contrast of
       10 and up to 0.2 nat at a contrast of 1.1.
 
-    Recommendation: under TALA, when the radius is sampled with HMC, end the movable
+    Usage rule: under TALA, when the radius is sampled with HMC, end the movable
     range at the density pair (a range end on a pair is allowed; the cut then never
     crosses it, nothing jumps, and no warning is issued). Values and derivatives are
     exact for the discrete model on both sides of the pair, so evaluating the kernels at
@@ -296,8 +304,11 @@ class Layers:
     boundary that starts at a density pair (``r0 = J``) gives at its construction radius
     kernels that differ by 4.4e-2 from the same layering with that boundary fixed on the
     pair (and by 9e-2 from the limit from below). Under FULL the three models are one.
-    The TALA rule of the pair step is an open owner question
-    (NOTES/chunks/c4b-boundaries-across-jumps/01-plan.md Q2).
+    Under TALA the step across a density pair is the anelastic rule of eq. 12.3 in all
+    three models (``rho0 u_r`` continuous), and the models differ only in the viscosity
+    of the step. A movable boundary is allowed to cross a density pair under TALA:
+    ``stokes_kernels`` issues the warning of ``propagate.solve``, and the usage rule
+    above applies.
 
     **Reference density of a moved node (affine method).** A moved node reads ``rho0`` from the
     piecewise-linear "knot table" at its new radius, so that the density structure stays
@@ -321,8 +332,8 @@ class Layers:
     knot function has a jump that a moved node meets as a discontinuity in the boundary
     radius. A concrete ``rho0`` that breaks this raises ``ValueError``; a traced one is
     not checked. A traced ``rho0`` is also not checked against the static limits
-    ``kappa_h`` and ``rho0_max`` below (as every traced leaf since chunk 2); the caller's
-    prior must keep it inside them. Under ``"cut"`` no node moves: every entry of
+    ``kappa_h`` and ``rho0_max`` below (no traced leaf is checked against its values); the
+    caller's prior must keep it inside them. Under ``"cut"`` no node moves: every entry of
     ``rho0`` is data, and the equal-value rule applies to the members of a duplicated node
     only.
 
@@ -442,8 +453,15 @@ class Layers:
     its range, measured from the range end whose input radii are equally spaced. This
     moves the largest group out of the range and halves the estimate on the PREM table.
     A C1 interpolation of the kernel rows in ``r`` would remove the group jumps for every
-    ``r0``; it is later work (NOTES/PLAN.md section 9). The kinks never bias a Metropolis-corrected sampler (leapfrog stays
-    volume preserving and reversible); they lower the acceptance rate.
+    ``r0``. The package does not implement it: the cut method (above) has no such kinks
+    under an incompressible formulation. The kinks never bias a Metropolis-corrected
+    sampler (leapfrog stays volume preserving and reversible); they lower the acceptance
+    rate. Measured with the HMC example (``examples/hmc_layers.py``, runs B and C of
+    NOTES/chunks/c5-integration/03-implementation.md): on a range that ends at the 670 km
+    density jump (FULL, 137 nodes, ``lmax = 20``, 1000 transitions) the affine method and
+    the cut give the same mean Metropolis probability within its standard error: 0.957 for
+    both at step 0.5, 0.832 against 0.833 (standard error of the paired difference 0.002)
+    at step 1.0.
 
     Parameters
     ----------
@@ -541,8 +559,7 @@ class Layers:
         movable = {int(k): (float(v[0]), float(v[1])) for k, v in movable.items()}
         # The density-jump pairs of the input table strictly inside each range, and the
         # method of the movable boundaries: "auto" is "cut" when a range holds one, and
-        # "affine" otherwise (the chunk 4 method, bit for bit); None without a movable
-        # boundary.
+        # "affine" otherwise; None without a movable boundary.
         jumps_in = {k: self._density_jumps(r_in, rho_in, lo, hi) for k, (lo, hi) in movable.items()}
         if not movable:
             self.motion = None
@@ -969,7 +986,10 @@ class Layers:
     def width_factor(self) -> float:
         """The largest ratio of the width limit of an interval to its construction width
         (1.0 without a movable boundary). The Pade plan is built for the limits, so a
-        large factor costs squarings, not accuracy (plan D3)."""
+        large factor costs squarings and, with them, rounding: a factor 4 to 17 in the
+        error of the kernels for three more squarings, up to 1.6e-12 at a width factor of
+        7.7 (NOTES/chunks/c4-controls-derivatives/04-review-physics-r2.md, minor 1). Put
+        the construction radius near the middle of its range (plan D3)."""
         lim = self.profile.structure.limits
         if lim is None:
             return 1.0
@@ -986,9 +1006,16 @@ class Layers:
         return propagate.static_plan(self.profile.structure, config).pade
 
     def full_boundaries(self, movable_radii) -> jax.Array:
-        """The ``(B,)`` boundary vector from the movable radii alone, ``(R,)`` in m (the
-        fixed entries are the construction radii, bit for bit). A sampler's control vector
-        then holds only radii that have a derivative."""
+        """The ``(B,)`` boundary vector from the movable radii alone (the fixed entries are
+        the construction radii, bit for bit). A sampler's control vector then holds only
+        radii that have a derivative.
+
+        Parameters
+        ----------
+        movable_radii
+            ``(R,)`` radii in m, one per movable boundary in the order of
+            ``movable_index``; concrete or traced.
+        """
         x = jnp.asarray(movable_radii, dtype=jnp.float64)
         if x.shape != (self.movable_index.size,):
             raise ValueError(f"movable_radii must hold one radius in m per movable boundary, shape "
@@ -1019,9 +1046,16 @@ class Layers:
 
         Returns
         -------
-        ``RadialProfile`` with the construction structure: the moved radii, ``rho0`` from
-        the knot table at the moved nodes, ``eta = exp(log_eta)[layer_of]``, and the scalar
-        leaves of the input profile (set others with ``replace``).
+        ``RadialProfile`` with the construction structure and the scalar leaves of the
+        input profile (set others with ``replace``).
+
+        - Under ``"affine"`` (and without a movable boundary): the moved radii, ``rho0``
+          from the knot table at the moved nodes (the ``rho0`` control or the
+          construction ``rho0`` elsewhere), ``eta = exp(log_eta)[layer_of]``.
+        - Under ``"cut"``: the radii of the construction table, ``rho0`` of the control
+          (or of the construction) at every node, ``eta = exp(log_eta)[layer]`` with the
+          layer of each node from its side of the clamped cut radii (a node on a cut is
+          below it), and the leaf ``cut_radius`` holding the clamped radii, ``(R,)`` m.
         """
         values = jnp.asarray(log_eta, dtype=jnp.float64)
         cut = self.motion == "cut"

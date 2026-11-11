@@ -48,6 +48,26 @@ the input table through ``Layers.fields``); ``viscosity_by_node`` maps one log
 viscosity per node; ``ControlVector`` turns a pytree of controls into one vector with a
 jitted value and gradient and a NumPy front, and ``fields.spectral_misfit`` is a weighted
 degree-power misfit. The prior and the sampler are the caller's.
+
+Public names (``__all__``):
+
+- configuration and kernels: ``StokesConfig`` (static: ``lmax``, flags, units,
+  ``Numerics``), ``Numerics`` (the static numerical options), ``stokes_kernels`` (the
+  pure function), ``Kernels`` (the four kernels per degree and node);
+- flags: ``Formulation``, ``GravityModel``, ``Hydrostatic``, ``Uniform``,
+  ``BoundaryCondition`` (the base class of ``FreeSlip`` and ``NoSlip``),
+  ``DegreeOneFrame`` (the frame request of degree 1);
+- profile: ``RadialProfile`` (the pytree of the radial model), ``NodeStructure`` (its
+  static node table), ``NodeLimits`` (the static limits of a movable layering),
+  ``integrate_gravity`` (the hydrostatic gravity of eq. 6.1), ``Units`` (constants and
+  the density scale);
+- fields: ``Fields``, ``apply``, ``quadrature_weights`` (the trapezoid weights),
+  ``spectral_misfit``, ``surface_gravity`` (``g(R)`` of the profile),
+  ``gravity_anomaly``, ``admittance``;
+- controls: ``Layers``, ``MovableRange`` (the static record of one movable boundary),
+  ``viscosity_by_node`` and ``NodeViscosity`` (its map), ``ControlVector``;
+- modules: ``fields``, ``sh``, ``controls``. The module ``stokesjx.io.legacy`` (CODE-A's
+  file formats, numpy only) is not imported by the package; import it on use.
 """
 
 import jax as _jax

@@ -99,6 +99,11 @@ def read_sph(path) -> SphDensity:
     ``l = 0 .. LMAX``, ``m = 0 .. l``. The header text is never parsed beyond the two
     integers, so the reader does not depend on it.
 
+    Parameters
+    ----------
+    path
+        The ``.sph`` file.
+
     Returns
     -------
     ``SphDensity`` with the radius in m and everything CMB first.
@@ -136,6 +141,11 @@ def read_sphco(path) -> np.ndarray:
     (audit row 11). ``L`` is the largest ``l`` of the file; degrees below the first line
     (``l_min = 1`` in CODE-A) are zero. A Fortran exponent of three digits without the
     letter ``E`` (``0.123456-100``) is read too.
+
+    Parameters
+    ----------
+    path
+        The ``SPHCO`` file.
     """
     rows = []
     with open(path) as fh:

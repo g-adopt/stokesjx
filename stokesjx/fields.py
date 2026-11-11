@@ -46,6 +46,12 @@ def quadrature_weights(profile: RadialProfile) -> jax.Array:
     to ``R - r_c`` and integrate a linear function exactly. They follow a traced radius
     (a movable boundary), and the static mask keeps the width of a pair an exact zero
     under every transformation, as in ``system.interval_widths``.
+
+    Parameters
+    ----------
+    profile
+        ``RadialProfile``: its radius (concrete or traced) and the static mask of its
+        structure.
     """
     r = jnp.asarray(profile.radius, jnp.float64)
     delta = (r[1:] - r[:-1]) * profile.structure.interval_mask
@@ -252,7 +258,17 @@ def surface_gravity(profile: RadialProfile, config: StokesConfig) -> jax.Array:
     """The background gravity at the surface, m/s^2 (scalar): the hydrostatic ``g(R)``
     of the profile (eq. 6.1) or the uniform value (eq. 6.2). It is the ``g(R)`` that
     converts the surface potential into the geoid kernel (eq. 9.1), so with it the
-    gravity anomaly is ``(l - 1) phi_l / R`` for every background (``gravity_anomaly``)."""
+    gravity anomaly is ``(l - 1) phi_l / R`` for every background (``gravity_anomaly``).
+
+    Parameters
+    ----------
+    profile
+        ``RadialProfile`` of the kernels (``rho0``, the radius and the core for the
+        hydrostatic gravity; the leaf ``uniform_gravity`` under ``Uniform(None)``).
+    config
+        ``StokesConfig``: its ``formulation.background`` selects the rule, its ``units``
+        give ``G``.
+    """
     from .propagate import background_gravity
     return background_gravity(profile, config.formulation, config.units)[-1]
 

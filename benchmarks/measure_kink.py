@@ -40,8 +40,11 @@ construction radius ``r0`` (kind 3). This script uses the package ``Layers`` and
 
 Decision (plan 8.4): ``E_TOL = 0.1`` nat. If ``E_rms <= E_TOL`` at every grid point, for both
 ``sigma_r``, on T1 and T2, for the decision set (the smooth anomaly of ``tests/densities.py``
-and the LEBEDEV tomography density), linear interpolation stays. Otherwise the numbers
-and the positions above the limit go to the owner; no remedy is implemented here. The
+and the LEBEDEV tomography density), linear interpolation stays. The measured values
+exceed the limit narrowly (0.103 and 0.137 nat). The outcome (NOTES/PLAN.md rulings 15 and
+17): the affine method keeps the usage rule of the ``Layers`` docstring (the construction
+radius at or above the middle of its range), and the viscosity cut (``motion="cut"``) has
+no such kinks under an incompressible formulation (the tables T1c and T2c below). The
 rough anomaly (an independent value per input node) is the stress case, recorded only.
 
 Tables:
@@ -88,7 +91,12 @@ lower limit is ``sqrt(lam) |[N]| = L / sigma_r``. Tables (``--tables T1c T2c T3 
   (it holds the 5700 and 5970 km jumps), 1e22, 3e20, 1e22 Pa s, ``lmax = 50``;
 - T3t: T3 under TALA at the viscosity contrasts 1.1, 3, 10 and 100 across the boundary
   (lower-mantle viscosity ``contrast x 1e21`` Pa s; the contrast 10 is T3), names
-  ``T3t-1.1`` and so on (``T3t`` runs all four).
+  ``T3t-1.1`` and so on (``T3t`` runs all four);
+- T3te: TALA on a range that ENDS at the 670 km density pair, ``(5700, 5970)`` km, so that
+  the cut never crosses a density jump (the usage rule of the ``Layers`` docstring under
+  TALA), construction radius 5850 km, ``motion="cut"``, at the viscosity contrasts 10 and
+  1.1 (names ``T3te-10`` and ``T3te-1.1``; ``T3te`` runs both). It measures the kinks that
+  remain at the input nodes under TALA when the usage rule is followed.
 
 Rule (gate G6 of the c4b plan): on T1c, T2c, T3 and T4, ``rho_max <= 1e-8``, ``E_rms <= 1e-3``
 nat and ``E_value <= 1e-6`` nat for the three anomalies and both ``sigma_r``. T3t is recorded.
@@ -340,10 +348,16 @@ def cut_table(name: str):
                       movable={1: (5466.875e3, 5970e3)}, motion="cut")
         return L, np.log(HAGER4), sj.StokesConfig(lmax=100)
     p = profile_from_table(cases.t_prem())
-    if name == "T3" or name.startswith("T3t"):
+    if name == "T3" or (name.startswith("T3t") and not name.startswith("T3te")):
         L = sj.Layers(p, np.array([3480e3, 5700e3, 5970e3, 6270e3, 6370e3]), movable={1: (5466.875e3, 5970e3)})
         contrast = 10.0 if name == "T3" else float(name.split("-")[1])
         form = sj.Formulation(compressible=name.startswith("T3t"))
+        return L, np.log(np.array([contrast * 1e21, 1e21, 3e20, 1e22])), sj.StokesConfig(lmax=50, formulation=form)
+    if name.startswith("T3te"):
+        L = sj.Layers(p, np.array([3480e3, 5850e3, 5970e3, 6270e3, 6370e3]), movable={1: (5700e3, 5970e3)},
+                      motion="cut")
+        contrast = float(name.split("-")[1])
+        form = sj.Formulation(compressible=True)
         return L, np.log(np.array([contrast * 1e21, 1e21, 3e20, 1e22])), sj.StokesConfig(lmax=50, formulation=form)
     if name == "T4":
         L = sj.Layers(p, np.array([3480e3, 5800e3, 6270e3, 6370e3]), movable={1: (5466.875e3, 6150e3)})
@@ -512,7 +526,8 @@ def main(argv=None):
         raise SystemExit(f"{path} exists; pass --overwrite to replace it")
     t0 = time.time()
     load0 = os.getloadavg()
-    tables = [t for name in a.tables for t in (["T3t-1.1", "T3t-3", "T3t-10", "T3t-100"] if name == "T3t" else [name])]
+    expand = {"T3t": ["T3t-1.1", "T3t-3", "T3t-10", "T3t-100"], "T3te": ["T3te-10", "T3te-1.1"]}
+    tables = [t for name in a.tables for t in expand.get(name, [name])]
     records = [measure_cut(t) if (t in CUT_TABLES or t.startswith("T3t")) else measure(t) for t in tables]
     dec = decision(records)
     if any(r["table"] in ("T1", "T2") for r in records):

@@ -180,8 +180,9 @@ def pade_product_count(order: int) -> int:
 
 
 def pade_numerator(order: int, x: float) -> float:
-    """Scalar Pade numerator ``N_m(x) = sum_k c_k x^k``. All ``c_k`` are positive, so
-    for ``||X||_1 <= x`` every column of ``N(+-X) - I`` has a 1-norm of at most
+    """Scalar Pade numerator ``N_m(x) = sum_k c_k x^k`` of the diagonal Pade approximant
+    of order ``order`` at the norm bound ``x``. All ``c_k`` are positive, so for
+    ``||X||_1 <= x`` every column of ``N(+-X) - I`` has a 1-norm of at most
     ``N_m(x) - 1``."""
     return sum(ck * x ** k for k, ck in enumerate(_pade_coefficients(order)))
 
@@ -190,7 +191,8 @@ def pade_denominator_margin(order: int, x: float) -> float:
     """Lower bound ``2 - N_m(x)`` of the column diagonal dominance of both Pade
     denominators for ``||X||_1 <= x``: in every column ``j``,
     ``|D_jj| - sum_(i != j) |D_ij| >= 1 - ||(D - I) e_j||_1 >= 2 - N_m(x)``. Positive
-    means that elimination without pivoting is stable (``solve_elimination``)."""
+    means that elimination without pivoting is stable (``solve_elimination``). ``order``
+    is the Pade order ``m``, ``x`` the norm bound."""
     return PADE_DENOMINATOR_LIMIT - pade_numerator(order, x)
 
 

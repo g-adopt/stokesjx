@@ -209,6 +209,13 @@ def interval_widths(radius, structure: NodeStructure) -> jax.Array:
     (2.4e-14 on 129 nodes), which set the error floor of the steps at high degree
     (NOTES/chunks/c1-foundations/04-review-physics-r3.md, minor 3). The static mask makes the
     width of a pair exactly zero, so its step is exactly the identity.
+
+    Parameters
+    ----------
+    radius
+        ``(N,)`` node radii in m (can be traced).
+    structure
+        ``NodeStructure``: the static interval mask.
     """
     r = jnp.asarray(radius, jnp.float64)
     return jnp.log1p((r[1:] - r[:-1]) / r[:-1]) * structure.interval_mask
@@ -362,6 +369,17 @@ def jump_vectors(radius, gravity, eta_ref, units: Units) -> jax.Array:
     ``[y3] = r g / eta_ref``: the radial stress below the sheet carries its weight.
     ``[y6] = -4 pi G r^2 rho_s / eta_ref``: the potential gradient jumps by the sheet's
     attraction. All other components are continuous. Units m/s per kg/m^2.
+
+    Parameters
+    ----------
+    radius
+        ``(N,)`` node radii in m.
+    gravity
+        ``(N,)`` background gravity at the nodes, m/s^2.
+    eta_ref
+        The viscosity scale ``eta_s`` of the state, Pa s.
+    units
+        ``Units``: ``G``, ``pi`` and the density scale ``rho_s``.
     """
     r = jnp.asarray(radius, jnp.float64)
     z = jnp.zeros_like(r)

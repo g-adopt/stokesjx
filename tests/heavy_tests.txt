@@ -34,7 +34,7 @@ tests/test_flags.py::test_flag_invariants
 tests/test_sh.py::test_synthesis_grid_against_evaluate
 # Chunk 4 (c4-controls-derivatives): quick tests above about 2 s under `-n 8` (measured on
 # reunion, 2026-11-11, load average 8 to 9 at the start with four processes of another job),
-# and the c1 and c2 tests above 2 s that the list did not hold (c3 JAX review, minor 9).
+# and the c1 and c2 tests above 2 s under the same conditions.
 tests/test_controls_ad.py::test_p1
 tests/test_controls_ad.py::test_p2
 tests/test_controls_ad.py::test_p3
@@ -75,3 +75,19 @@ tests/test_kernels_ad.py::test_t8_wide5
 tests/test_kernels_ad.py::test_t9_stiff_lid
 tests/test_linalg.py::test_solve_elimination_value_and_derivative
 tests/test_linalg.py::test_solve_nodes_pivot_derivative
+# Chunk 5 (c5-integration): quick tests above about 2 s under `-n 8`, the time of the module
+# fixture included (measured on reunion, 2026-11-11, load average 6 to 10).
+tests/test_examples.py::test_metropolis_rule
+tests/test_examples.py::test_examples_cli
+tests/test_examples.py::test_gradient_example_full
+tests/test_examples.py::test_map_gate_rejects_second_mode
+tests/test_examples.py::test_hmc_smoke_main
+tests/test_examples.py::test_metric_is_spd_and_matches_hessian
+tests/test_examples.py::test_hmc_energy_error_order
+tests/test_examples.py::test_hmc_energy_error_order_control
+tests/test_examples.py::test_metric_uses_its_weights
+tests/test_examples.py::test_gradient_example
+tests/test_examples_ad.py
+tests/test_controls_cut.py::test_taylor_radius_linear
+tests/test_controls_cut.py::test_v10_viscosity_pair_and_surface
+tests/test_docs.py::test_readme_quick_start

@@ -72,7 +72,10 @@ compile, at most 1.10; the HEAD numbers come from ``--head-json`` records of thi
 run with the HEAD tree); B8 SJ and SJ100 ``layers`` over ``direct`` (run and compile, at most
 1.10) and inside the budgets 48 ms (SJ) and 181 ms (SJ100); B9 ``layers_cut_vmap4`` and SJ
 ``layers_vmap4`` at most 4.0 times one call; B10 ``layers_field - layers`` of the cut at most
-+2 ms (S1, SJ) and +6 ms (S2) run and +0.10 s compile. B6 (every chunk 4 program, run and
++2 ms (S1, SJ) and +6 ms (S2) run and +0.10 s compile. B7 is the cost gate of the cut: it
+compares the cut with the affine method at the same controls. B8 compares with a heavier
+``direct`` program (it also differentiates the per-node ``log eta``, ``rho0`` and the
+radius), so its ratio is not a measure of the cost of the cut. B6 (every chunk 4 program, run and
 gradient compile, new tree over HEAD, at most 1.10) is ``--compare-head NEW.json ... --head-json
 HEAD.json ...``: the medians over the records of each tree.
 """

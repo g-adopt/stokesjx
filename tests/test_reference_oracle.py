@@ -812,8 +812,9 @@ def test_g18a_pair_is_limit_of_narrow_interval(load_oracle):
 
 
 def test_pair_rule_size(load_oracle):
-    """Size of the choice between the anelastic and the material pair rule
-    (diagnostic for Q6)."""
+    """The size of the difference between the anelastic and the material pair rule; the
+    package implements the anelastic rule (NOTES/PLAN.md ruling 18: the density jumps of
+    ``rho0`` are phase changes)."""
     A = load_oracle("prem_tala_fsfs")
     B = load_oracle("prem_tala_fsfs_material")
     for l in (2, 10):

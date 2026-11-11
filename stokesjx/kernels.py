@@ -337,4 +337,6 @@ def stokes_kernels(profile: RadialProfile, config: StokesConfig) -> Kernels:
     # The low layer is imported here: propagate imports this module for the
     # configuration and the kernel record.
     from . import propagate
-    return propagate.solve(profile, config)
+    # stacklevel 3: the TALA warning of solve names the line of the caller of this
+    # function (solve -> stokes_kernels -> caller).
+    return propagate.solve(profile, config, _warn_stacklevel=3)
