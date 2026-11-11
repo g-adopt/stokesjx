@@ -88,9 +88,10 @@ class NodeStructure:
         and zero at a pair. ``log1p`` of the relative gap is used in place of
         ``log(r_i / r_(i-1))``: the ratio is close to one, and its rounding gives the
         width a relative error of ``2.2e-16 / h`` (2.4e-14 on 129 nodes), which sets
-        the error floor of the steps at high degree (physics review r3 of chunk 1,
-        minor 3). A movable boundary (chunk 4) widens these limits to the largest
-        width that its range allows (CONVENTIONS 2)."""
+        the error floor of the steps at high degree
+        (NOTES/chunks/c1-foundations/04-review-physics-r3.md, minor 3). A movable
+        boundary widens these limits to the largest width that its range allows
+        (CONVENTIONS 2)."""
         r = np.asarray(self.radius, dtype=np.float64)
         h = np.log1p((r[1:] - r[:-1]) / r[:-1])
         h[list(np.asarray(self.pairs, dtype=int) - 1)] = 0.0
@@ -193,7 +194,7 @@ def mantle_mass(radius, rho0, units: Units) -> jax.Array:
 def _as_f64(x):
     """``jnp.asarray(x, float64)``; ``None`` stays ``None``. The explicit dtype makes a
     NumPy input and a JAX input give the same strong float64 type, so they share one
-    trace (JAX review r3 of chunk 1, minor 2)."""
+    trace (NOTES/chunks/c1-foundations/04-review-jax-r3.md, minor 2)."""
     return None if x is None else jnp.asarray(x, dtype=jnp.float64)
 
 
@@ -211,7 +212,7 @@ class RadialProfile:
         model in which the pair opens into an interval of finite width: it moves the
         shell mass of the gravity integral and leaves the propagator at the identity.
         A control that moves a pair must move both of its nodes together (the Taylor
-        test T4 does, and ``Layers`` of chunk 4 will).
+        test T4 does, and a control map with movable boundaries must).
     rho0
         ``(N,)``, kg/m^3: the reference density at the nodes. The interval density is
         the mean of the two node values (eq. 12.1).
@@ -254,7 +255,12 @@ class RadialProfile:
     Every array is converted with ``jnp.asarray(x, dtype=jnp.float64)``. The
     constructor validates the inputs (shapes, non-decreasing radius, at least two
     nodes); the pytree unflatten does not, because JAX unflattens with tracers and
-    placeholders. ``propagate.solve`` checks the values of a concrete profile.
+    placeholders. ``propagate.solve`` checks the values of the concrete leaves.
+
+    The structure is the static auxiliary data of the pytree, and so part of the key of
+    every jitted solve: a profile built from a new radius array compiles again, even
+    with the same node count and pairs. Build a profile once and change its leaves with
+    ``replace``, which keeps the structure.
     """
 
     __slots__ = ("radius", "rho0", "eta", "core_density", "core_mass", "outer_density",

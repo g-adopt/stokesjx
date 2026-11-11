@@ -22,11 +22,23 @@ a derivative can move) and a static ``StokesConfig``, valid under ``jax.jit``,
 ``jax.grad``, ``jax.vmap`` and ``jax.jvp``. The derivatives are for Hamiltonian Monte
 Carlo over the radial viscosity; the package does not choose a sampler.
 
-This version solves FULL self-gravitation, incompressible flow and free slip at both
-boundaries, with a hydrostatic or a uniform background gravity, and degree 1 in the
-centre-of-mass frame (or raw where the static rule offers it). The other flags
-(NO_SELF_GRAVITY, TALA, no slip), the fields, the controls with movable boundaries
-and the I/O follow in later versions.
+Flags (``Formulation``): the gravity level (``GravityModel.FULL`` or
+``NO_SELF_GRAVITY``), the background gravity (``Hydrostatic()`` or ``Uniform(value)``),
+``compressible`` (TALA, the anelastic continuity ``div(rho0 v) = 0``) and the boundary
+class at the surface and at the CMB (``FreeSlip()`` or ``NoSlip()``); every combination is
+solved. Degree 1 is in the centre-of-mass frame, raw where the static rule offers it, or
+refused (the kernels then start at ``l = 2``).
+
+Fields (``stokesjx.fields``): ``apply(kernels, density, profile)`` integrates the four
+kernels against a density anomaly with the trapezoid weights of the node table in one
+einsum; ``gravity_anomaly`` and ``admittance`` are post-processing of the coefficients.
+Spherical harmonics (``stokesjx.sh``): three coefficient conventions (``complex_4pi`` of
+lovejx, ``real_4pi`` of SHTOOLS and of CODE-A's density files, ``real_orthonormal`` of
+CODE-A's output) with one layout rule for every coefficient array (the degree and order
+axes last, the ``C/S`` axis before them for a real convention), their conversions, a grid
+synthesis and the Gauss-Legendre transform of lovejx. CODE-A's file formats are read and
+written by ``stokesjx.io.legacy`` (imported on use). The control map with movable
+boundaries follows in a later version.
 """
 
 import jax as _jax
@@ -40,21 +52,27 @@ import jax as _jax
 _jax.config.update("jax_enable_x64", True)
 
 from .formulation import (  # noqa: E402
-    Boundary,
+    BoundaryCondition,
     DegreeOneFrame,
     Formulation,
+    FreeSlip,
     GravityModel,
     Hydrostatic,
+    NoSlip,
     Uniform,
 )
 from .kernels import Kernels, Numerics, StokesConfig, stokes_kernels  # noqa: E402
+from . import fields, sh  # noqa: E402
+from .fields import Fields, admittance, apply, gravity_anomaly, quadrature_weights, surface_gravity  # noqa: E402
 from .profile import NodeStructure, RadialProfile, integrate_gravity  # noqa: E402
 from .units import Units  # noqa: E402
 
 __version__ = "0.0.1.dev0"
 
 __all__ = [
-    "Boundary", "DegreeOneFrame", "Formulation", "GravityModel", "Hydrostatic", "Uniform",
+    "BoundaryCondition", "DegreeOneFrame", "Formulation", "FreeSlip", "GravityModel", "Hydrostatic",
+    "NoSlip", "Uniform",
     "Kernels", "Numerics", "StokesConfig", "stokes_kernels",
+    "Fields", "admittance", "apply", "gravity_anomaly", "quadrature_weights", "surface_gravity", "fields", "sh",
     "NodeStructure", "RadialProfile", "integrate_gravity", "Units",
 ]

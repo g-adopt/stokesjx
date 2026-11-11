@@ -61,7 +61,7 @@ class Units:
         ``rho_s`` in kg/m^3: the density unit of the state vector (eq. 3.1) and of the
         matrix entries ``a(3,6) = a(4,5) = -rho0 / rho_s`` (eq. 5.1). CODE-A's
         ``bgrho = 4500 kg/m^3`` (constants.h:80) is the default. No SI kernel depends
-        on it in exact arithmetic (equations.md section 11, gate G6 of chunk 1); in
+        on it in exact arithmetic (equations.md section 11; NOTES/chunks/c1-foundations/03-implementation.md, gate G6); in
         float64 a different value changes the kernels at the rounding level only, and
         it can change the Pade plan, because the static norm bound of the interval
         exponent contains ``rho0 / rho_s``.
@@ -93,5 +93,5 @@ class Units:
     @property
     def earth_mass(self) -> float:
         """Mass of the Earth, kg: ``5.9722e24`` or CODE-A's ``float32(5.974e24)``. Used
-        by the free-air conversion of the geoid (chunk 5), never by the kernels."""
+        by CODE-A's free-air kernel (``fields.gravity_anomaly`` in the tests), never by the kernels."""
         return _EARTH_MASS_LEGACY if self.legacy_constants else _EARTH_MASS

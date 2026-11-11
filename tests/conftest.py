@@ -120,3 +120,13 @@ def legacy_toolchain(legacy_dir) -> Path:
     if not CODE_A_SOURCE.is_dir():
         pytest.skip("the CODE-A original is not present")
     return CODE_A_SOURCE
+
+
+@pytest.fixture(scope="session")
+def legacy_work() -> Path:
+    """legacy/work/run-hager4_fsfs/out: the output of the golden Fortran run hager4_fsfs
+    (SPHCO files with 16 digits and the GRD_* grids). Skips when absent."""
+    out = REPO / "legacy" / "work" / "run-hager4_fsfs" / "out"
+    if not (out / "GRD_geoid").is_file():
+        pytest.skip("legacy/work/run-hager4_fsfs/out is not present")
+    return out

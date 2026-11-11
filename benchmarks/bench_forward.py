@@ -29,12 +29,17 @@ Gate (CONVENTIONS 7): 15 rounds that alternate the solver and the stand-in
 load average at the start and at the end; the ratio solver / stand-in must be at most
 2 for every run quantity, and the absolute times must be inside the budget table.
 
-Compile times are measured in fresh child processes, each after one unrelated warm-up
-compile that also lowers a tiny LAPACK solve: the first LAPACK lowering of a process
-imports ``scipy.linalg`` (``jaxlib/lapack.py``, ``prepare_lapack_call``, 0.12 s on
-reunion), which is a start-up cost of the process and not a compile cost of either
-program. Solver and stand-in are measured with the same protocol, three times each,
-median per quantity.
+Compile times are measured in fresh child processes (CONVENTIONS 7), each after one
+unrelated warm-up compile that also lowers a tiny LAPACK solve: the first LAPACK lowering
+of a process imports ``scipy.linalg`` (``jaxlib/lapack.py``, ``prepare_lapack_call``,
+0.12 s on reunion), which is a start-up cost of the process and not a compile cost of
+either program. No solve of the package runs in the child before the timed section: the
+scales of the functional come from the parent process, so the forward compile includes
+the trace of the core. Two protocols, three processes each, median per quantity:
+"first" (forward, then the gradient with respect to all controls: the first gradient
+compile of the process) and "sequential" (forward, gradient ``log eta``, gradient all,
+in this order in one process). Solver and stand-in are measured with the same
+protocols.
 
 Options measured at S1 and S2 (interleaved): the node solver (``"lapack"`` against
 ``"pivot_elimination"``) and block upper triangular products in the exponential
@@ -132,18 +137,30 @@ SIZES = {"S1": (golden_profile, 50), "S2": (lebedev_refined, 100), "S3": (golden
 # --------------------------------------------------------------------------
 
 
-def solver_functions(p0, lmax, numerics=sj.Numerics()):
+def kernel_scales(p0, lmax, numerics=sj.Numerics(), formulation=None):
+    """The largest absolute value of each of the four kernels at the base point (one
+    solve; the parent process computes them for the compile children)."""
+    cfg = sj.StokesConfig(lmax=lmax, numerics=numerics, formulation=formulation or sj.Formulation())
+    K0 = sj.stokes_kernels(p0, cfg)
+    ks = (K0.geoid, K0.surface_topography, K0.cmb_topography, K0.surface_velocity)
+    return [float(jnp.max(jnp.abs(k))) or 1.0 for k in ks]
+
+
+def solver_functions(p0, lmax, numerics=sj.Numerics(), scales=None, formulation=None):
     """``(forward, gradient_log_eta, gradient_all, x0)`` of the solver: a weighted sum of
     the four kernels, each divided by its largest value at the base point, as a
     function of ``x = (log_eta, rho0, radius)``; the forward function returns the four
-    kernels (the forward map), the gradients the gradient of the sum."""
-    cfg = sj.StokesConfig(lmax=lmax, numerics=numerics)
+    kernels (the forward map), the gradients the gradient of the sum. ``scales``: the
+    four kernel scales (``kernel_scales``); without them one solve computes them here,
+    which a compile child must avoid (CONVENTIONS 7)."""
+    cfg = sj.StokesConfig(lmax=lmax, numerics=numerics, formulation=formulation or sj.Formulation())
     x0 = (jnp.log(p0.eta), p0.rho0, p0.radius)
-    K0 = sj.stokes_kernels(p0, cfg)
-    ks = (K0.geoid, K0.surface_topography, K0.cmb_topography, K0.surface_velocity)
-    scales = [float(jnp.max(jnp.abs(k))) for k in ks]
+    if scales is None:
+        scales = kernel_scales(p0, lmax, numerics, formulation)
+    plan = propagate.static_plan(p0.structure, cfg)
+    shape = (len(plan.degrees), p0.structure.n_nodes)
     rng = np.random.default_rng(0)
-    W = [jnp.asarray(rng.standard_normal(k.shape)) / s for k, s in zip(ks, scales)]
+    W = [jnp.asarray(rng.standard_normal(shape)) / s for s in scales]
 
     def kernels(log_eta, rho0, radius):
         K = sj.stokes_kernels(p0.replace(eta=jnp.exp(log_eta), rho0=rho0, radius=radius), cfg)
@@ -360,17 +377,23 @@ def options(size: str, rounds: int) -> dict:
 # --------------------------------------------------------------------------
 
 
-def child_compile(which: str, size: str) -> dict:
-    """Compile times in this (fresh) process after the warm-up: solver or stand-in,
-    forward, gradient log_eta and gradient all, in this order."""
+PROTOCOLS = {"first": ("forward", "gradient_all"), "sequential": QUANTITIES}
+
+
+def child_compile(which: str, size: str, protocol: str = "sequential", scales: str = "") -> dict:
+    """Compile times in this (fresh) process after the warm-up: solver or stand-in, the
+    quantities of ``PROTOCOLS[protocol]`` in their order. The solver's kernel scales come
+    from the parent (``scales``, comma separated), so no solve runs before the timed
+    section."""
     warm_up()
     if which == "solver":
         make, lmax = SIZES[size]
-        fns, args = solver_functions(make(), lmax)
+        sc = [float(v) for v in scales.split(",")] if scales else None
+        fns, args = solver_functions(make(), lmax, scales=sc)
     else:
         fns, args, _ = standin_functions(*STANDIN[size])
     out = {}
-    for q in QUANTITIES:
+    for q in PROTOCOLS[protocol]:
         t0 = time.perf_counter()
         jax.jit(fns[q]).lower(*args).compile()
         out[q] = time.perf_counter() - t0
@@ -393,13 +416,18 @@ def run_child(mode: str, *args, env=None) -> dict:
 
 def compile_times(sizes, repeats: int = 3) -> dict:
     """Median over ``repeats`` fresh processes of the compile times, solver and
-    stand-in."""
+    stand-in, under both protocols (``PROTOCOLS``). The key ``<size>_<which>`` holds the
+    sequential protocol (the record of chunk 2), ``<size>_<which>_first`` the other."""
     out = {}
     for size in sizes:
+        make, lmax = SIZES[size]
+        scales = ",".join(repr(v) for v in kernel_scales(make(), lmax))
         for which in ("solver", "standin"):
-            runs = [run_child("compile", which, size) for _ in range(repeats)]
-            out[f"{size}_{which}"] = {q: statistics.median(r[q] for r in runs) for q in QUANTITIES}
-            out[f"{size}_{which}"]["runs"] = runs
+            for protocol in ("sequential", "first"):
+                runs = [run_child("compile", which, size, protocol, scales) for _ in range(repeats)]
+                key = f"{size}_{which}" + ("" if protocol == "sequential" else "_first")
+                out[key] = {q: statistics.median(r[q] for r in runs) for q in PROTOCOLS[protocol]}
+                out[key]["runs"] = runs
     return out
 
 
@@ -418,7 +446,7 @@ def main(argv=None):
     a = p.parse_args(argv)
     if a.child:
         mode = a.child[0]
-        res = child_compile(a.child[1], a.child[2]) if mode == "compile" else child_one_thread(a.child[1])
+        res = child_compile(*a.child[1:]) if mode == "compile" else child_one_thread(a.child[1])
         print(json.dumps(res))
         return
     rounds = 3 if a.quick else a.rounds
@@ -477,6 +505,9 @@ def report(rec):
         c_s, c_t = rec["compile"][f"{size}_solver"], rec["compile"][f"{size}_standin"]
         for q in QUANTITIES:
             print(f"{size} compile {q:17s} solver {c_s[q]:.3f} s  stand-in {c_t[q]:.3f} s  ratio {c_s[q] / c_t[q]:.2f}")
+        f_s, f_t = rec["compile"][f"{size}_solver_first"], rec["compile"][f"{size}_standin_first"]
+        for q in PROTOCOLS["first"]:
+            print(f"{size} compile (first) {q:17s} solver {f_s[q]:.3f} s  stand-in {f_t[q]:.3f} s")
     for size, o in rec["options"].items():
         for q in QUANTITIES:
             print(f"{size} options {q:17s} " + "  ".join(

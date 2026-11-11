@@ -33,6 +33,33 @@ def profile_from_table(table, *, surface_density=None, core_mass=..., structure=
                          structure=structure)
 
 
+def formulation_from_physics(physics):
+    """The package ``Formulation`` of an oracle ``Physics`` record (the oracle's strings
+    to the package flags). ``degree_one`` and the scales are not flags of the
+    formulation; the caller passes them to ``StokesConfig`` and ``Units``."""
+    import stokesjx as sj
+    gravity = {"full": sj.GravityModel.FULL, "none": sj.GravityModel.NO_SELF_GRAVITY}[physics.self_gravity]
+    background = sj.Hydrostatic() if physics.background == "hydrostatic" else sj.Uniform(float(physics.uniform_g))
+    bc = {"free_slip": sj.FreeSlip(), "no_slip": sj.NoSlip()}
+    return sj.Formulation(gravity=gravity, background=background, compressible=physics.compressible,
+                          surface=bc[physics.surface], cmb=bc[physics.cmb])
+
+
+def legacy_weights(radius) -> np.ndarray:
+    """CODE-A's radial quadrature weights: ``(R - r_c) / nr`` at every one of the
+    ``nr + 1`` nodes (calc.f:51, 84-92; audit row 4), in m. Test-only: the package uses
+    the trapezoid rule (``fields.quadrature_weights``)."""
+    r = np.asarray(radius, dtype=np.float64)
+    return np.full_like(r, (r[-1] - r[0]) / (len(r) - 1))
+
+
+def to_cilm(c) -> np.ndarray:
+    """``[..., l, m, C/S]`` (the layout of ``tests/cases.py`` and of
+    ``test_golden._read_lebedev_coefficients``) to the layout rule of the package,
+    ``[..., C/S, l, m]`` (SHTOOLS ``cilm``)."""
+    return np.moveaxis(np.asarray(c), -1, -3)
+
+
 def row_errors(actual, reference) -> np.ndarray:
     """``e_l`` per row of two ``(L, N)`` arrays: ``max_j |a - r| / max_j |r|``; ``inf`` for a
     row whose reference is an exact zero and whose actual row is not, 0 when both are

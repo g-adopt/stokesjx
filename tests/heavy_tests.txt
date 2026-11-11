@@ -22,3 +22,13 @@ tests/test_kernels_ad.py::test_hessian_finite_and_symmetric
 tests/test_kernels_ad.py::test_vmap_equals_single_calls
 tests/test_linalg.py::test_solve_nodes_value
 tests/test_system_boundary.py::test_interval_steps_against_oracle
+# Chunk 3 (c3-flags-fields): quick tests above about 2 s under `-n 8` (measured on reunion,
+# 2026-11-11, load average 6 to 22 with another job at four processes).
+tests/test_kernels_ad.py::test_t12_tala_rho0
+tests/test_kernels_ad.py::test_t13_no_self_gravity_uniform
+tests/test_kernels_ad.py::test_t14_tala_no_slip
+tests/test_kernels_ad.py::test_t15_field_misfit
+tests/test_flags.py::test_steps_flags_against_oracle
+tests/test_flags.py::test_vmap_flags
+tests/test_flags.py::test_flag_invariants
+tests/test_sh.py::test_synthesis_grid_against_evaluate

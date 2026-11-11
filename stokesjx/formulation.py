@@ -1,13 +1,13 @@
-"""The physics flags (PLAN section 5) and the static degree-1 frame rule.
+"""The physics flags (PLAN section 5), the boundary classes, the term record of the
+solver and the static degree-1 frame rule.
 
 A ``Formulation`` is a plain frozen record of the flags: the gravity model, the
 background gravity, the compressibility and the boundary class at the surface and at
-the CMB. It accepts every flag value, so that the static frame table of
-``degree_one_options`` can be built and tested for every configuration. The solver of
-this chunk solves the default incompressible, self-gravitating, free-slip problem with
-a hydrostatic or a uniform background; ``kernels.StokesConfig`` refuses the other
-values with ``NotImplementedError``. Every solve goes through a ``StokesConfig``, so no
-path reaches the solver with such a value.
+the CMB. Every combination of the flags is solved (32 combinations of the five binary
+choices). ``terms(formulation)`` resolves the flags once into the record ``Terms``
+that the solver reads, as lovejx resolves its flags into assembly objects
+(``lovenumbers/formulation.py``): ``system``, ``boundary`` and ``propagate._core`` read
+``Terms`` and never the gravity enum.
 
 The gravity model keeps the lovejx name ``GravityModel`` and the member values
 ``"full"`` and ``"no_self_gravity"`` of lovejx (ruling 6: every convention follows
@@ -20,18 +20,28 @@ lovejx). The instantaneous Stokes problem has two levels (PLAN section 5):
   load and the deflected boundaries (eq. 5.2). This is the second level of the G-ADOPT
   benchmark.
 
-Static switch points of the next chunk (each one a Python ``if`` on a flag, never on a
-traced value): ``system.balanced_exponent`` (self-gravity entries, the TALA ``K``
-term), ``system.pair_steps`` (TALA pair rule), ``boundary.cmb_basis`` (tangential
-unknown, ``rho_c`` term), ``boundary.surface_basis`` (tangential row),
-``boundary.surface_functionals`` (``rho_w phi`` term, velocity under no slip),
-``boundary.cmb_functional`` (``rho_c phi`` term), ``propagate.background_gravity``.
+Static switch points of the solver (each one a Python ``if`` on a field of ``Terms``,
+never on a traced value):
+
+- ``system.balanced_exponent``: the self-gravity entries (``self_gravity``) and the
+  TALA ``K`` term (``anelastic``, with ``system.kappa_widths``);
+- ``system.anelastic_pair_terms``: the closed-form TALA step across a jump pair
+  (``anelastic``, eq. 12.3);
+- ``boundary.cmb_basis``: the tangential unknown of the CMB class and the ``rho_c``
+  term (``self_gravity``);
+- ``boundary.surface_basis``: the tangential unknown of the surface class;
+- ``boundary.surface_functionals``: the ``rho_w phi`` term (``self_gravity``);
+- ``boundary.cmb_functional``: the ``rho_c phi`` term (``self_gravity``);
+- ``propagate.background_gravity``: hydrostatic or uniform ``g`` (the background is
+  not part of ``Terms``; it changes a traced array, not a term of the equations).
 """
 
 from __future__ import annotations
 
+import abc
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import ClassVar
 
 
 class GravityModel(Enum):
@@ -65,11 +75,102 @@ class Uniform:
         object.__setattr__(self, "value", float(self.value))
 
 
-class Boundary(Enum):
-    """Boundary class at the surface or the CMB (eq. 8.1). ``u_r = 0`` in both."""
+class BoundaryCondition(abc.ABC):
+    """Base of the tangential boundary classes at the surface and at the CMB.
 
-    FREE_SLIP = "free_slip"   # sigma_rt = 0
-    NO_SLIP = "no_slip"       # u_t = 0
+    Every class has ``u_r = 0`` at its boundary (eq. 8.1, ``y1 = 0``) and one condition
+    on the tangential part of the state. With ``u_r = 0`` and that condition, exactly
+    one direction of the tangential pair ``(y2, y4)`` stays free at the boundary (eq.
+    3.1: ``y2 = u_t``, ``y4 = r sigma_rt / eta_s``). ``tangential_unknown`` returns it as
+    the coefficients ``(a, b)`` of the state direction ``a e2 + b e4``;
+    ``boundary.cmb_basis`` and ``boundary.surface_basis`` put that direction into the
+    three-vector basis of the boundary.
+
+    Rules for a class:
+
+    - It is a frozen dataclass, and every field is a hashable static Python value. A
+      boundary class is a field of ``Formulation``, which is a field of
+      ``StokesConfig``, and the config is a static argument of the jitted solver and
+      the key of the cache of ``propagate.static_plan``. A JAX array or a tracer in a
+      field raises ``ValueError: Non-hashable static arguments are not supported``
+      under ``jax.jit``. So a traced boundary parameter never lives in the config: it
+      reaches ``tangential_unknown`` through the argument ``parameter``.
+    - ``traction_free`` (class attribute) is true when the class sets the tangential
+      traction to zero identically. The degree-1 frame rule (``degree_one_options``)
+      reads only this attribute, never a class name: a boundary without a tangential
+      traction cannot hold the net force of a degree-1 load, an anchored one can.
+
+    The arguments of ``tangential_unknown``:
+
+    radius
+        Traced scalar, the boundary radius in m.
+    eta_ref
+        Traced scalar, the viscosity scale ``eta_s`` of the state in Pa s
+        (``propagate.reference_viscosity``).
+    side
+        Static Python int, ``+1`` at the surface and ``-1`` at the CMB: the sign of the
+        outward normal of the mantle at the boundary, ``n = side e_r``. The traction
+        that the outside exerts on the mantle has the tangential part
+        ``side sigma_rt``. A law that sets a component to zero does not need it; a law
+        that depends on the direction of the traction (a drag) does.
+    parameter
+        ``None`` or a traced scalar, the value of a boundary parameter of the class.
+        The solver passes ``None`` for every class of this version.
+
+    A later partial-slip class (a drag that opposes the motion, ``side sigma_rt =
+    -beta u_t`` with the drag coefficient ``beta >= 0`` in Pa s/m) returns
+    ``(1.0, -side * radius * parameter / eta_ref)``: in the state this is
+    ``y4 = -side (r beta / eta_ref) y2``, so ``sigma_rt = -beta u_t`` at the surface and
+    ``sigma_rt = +beta u_t`` at the CMB, and the limit of large ``beta`` is the no-slip
+    direction ``e4``. That class changes three things and nothing else: the class
+    here; one optional scalar leaf per boundary in the traced inputs (for example a
+    leaf of ``RadialProfile`` with default ``None``, so that the pytree of every
+    existing profile stays the same); and the two calls of ``cmb_basis`` and
+    ``surface_basis`` in ``propagate._core``, which pass that leaf as ``parameter``.
+    ``boundary.py``, ``system.py``, the sweeps, the node solve and the output rows do
+    not change. Open question for that class: it carries a tangential traction, so it
+    has ``traction_free = False``, and the frame rule then treats it as an anchored
+    boundary (degree 1 refused by default under FULL with hydrostatic gravity). Whether
+    a finite drag anchors the mantle in the same sense as no slip needs its own
+    argument when the class is added.
+    """
+
+    traction_free: ClassVar[bool]
+
+    @abc.abstractmethod
+    def tangential_unknown(self, radius, eta_ref, side: int, parameter=None) -> tuple:
+        """The free tangential direction ``a e2 + b e4`` of the state at the boundary,
+        as ``(a, b)``. See the class docstring for the arguments."""
+
+
+@dataclass(frozen=True)
+class FreeSlip(BoundaryCondition):
+    """Free slip: ``u_r = 0`` and ``sigma_rt = 0`` (``y1 = y4 = 0``, eq. 8.1).
+
+    The free tangential unknown is the velocity ``u_t``, the direction ``e2``. The
+    tangential traction is zero identically (``traction_free = True``)."""
+
+    traction_free: ClassVar[bool] = True
+
+    def tangential_unknown(self, radius, eta_ref, side: int, parameter=None) -> tuple:
+        """``(1.0, 0.0)``: the direction ``e2``, as Python floats for every argument, so
+        that the boundary basis stays a static coefficient array."""
+        return 1.0, 0.0
+
+
+@dataclass(frozen=True)
+class NoSlip(BoundaryCondition):
+    """No slip: ``u_r = 0`` and ``u_t = 0`` (``y1 = y2 = 0``, eq. 8.1).
+
+    The free tangential unknown is the shear stress, the direction ``e4``. The boundary
+    carries a tangential traction (``traction_free = False``). Under a no-slip surface
+    the surface velocity kernel is an exact zero (``Kernels.surface_velocity``)."""
+
+    traction_free: ClassVar[bool] = False
+
+    def tangential_unknown(self, radius, eta_ref, side: int, parameter=None) -> tuple:
+        """``(0.0, 1.0)``: the direction ``e4``, as Python floats for every argument."""
+        return 0.0, 1.0
 
 
 class DegreeOneFrame(Enum):
@@ -110,35 +211,78 @@ class Formulation:
     Attributes
     ----------
     gravity
-        ``GravityModel.FULL`` (default) or ``NO_SELF_GRAVITY``.
+        ``GravityModel.FULL`` (default) or ``NO_SELF_GRAVITY`` (eq. 5.1, 5.2).
     background
-        ``Hydrostatic()`` (default) or ``Uniform(value)``.
+        ``Hydrostatic()`` (default) or ``Uniform(value)`` (eq. 6.1, 6.2).
     compressible
-        ``False`` (default): incompressible. ``True``: TALA, ``div(rho0 v) = 0``
-        (eq. 1.2, 4.3).
+        ``False`` (default): incompressible, ``div v = 0``. ``True``: TALA, the
+        anelastic continuity ``div(rho0 v) = 0`` (eq. 1.2, 4.3), with the deviatoric
+        stress ``2 eta (e - div(v) I / 3)``; the ``-2/3 eta div v`` term leaves the
+        matrix A unchanged (F2 of equations.md section 4), so TALA adds only the term
+        ``kappa K`` with ``kappa = d ln rho0 / d ln r``. The discrete step is exact for
+        a power-law ``rho0`` inside an interval (eq. 12.2), and the step across a jump
+        pair is the anelastic rule (eq. 12.3): ``rho0 u_r`` is continuous across a
+        density jump, the ``h -> 0`` limit of the interval step. The other reading
+        (``u_r`` continuous, the "material" rule) changes the PREM TALA geoid kernel
+        by up to 18 % at ``l = 2`` and the topographies by 2 % (equations.md section
+        12, test_pair_rule_size of the oracle). The choice is open with the owner
+        (question Q6); the package implements the anelastic rule only.
     surface, cmb
-        Boundary class at each boundary, default free slip.
-
-    The record accepts every value; ``kernels.StokesConfig`` refuses the values that
-    this chunk does not solve (NO_SELF_GRAVITY, TALA, no slip).
+        Boundary class at each boundary, ``FreeSlip()`` (default) or ``NoSlip()``
+        (``BoundaryCondition``).
     """
 
     gravity: GravityModel = GravityModel.FULL
     background: Hydrostatic | Uniform = field(default_factory=Hydrostatic)
     compressible: bool = False
-    surface: Boundary = Boundary.FREE_SLIP
-    cmb: Boundary = Boundary.FREE_SLIP
+    surface: BoundaryCondition = field(default_factory=FreeSlip)
+    cmb: BoundaryCondition = field(default_factory=FreeSlip)
 
     def __post_init__(self):
         # Type checks only: a wrong type would select a wrong static branch without
-        # an error.
+        # an error (an enum member or a string in place of a boundary class has no
+        # tangential_unknown, and a string "no_slip" is truthy).
         if not isinstance(self.gravity, GravityModel):
             raise TypeError(f"gravity must be a GravityModel, got {self.gravity!r}")
         if not isinstance(self.background, (Hydrostatic, Uniform)):
             raise TypeError(f"background must be Hydrostatic() or Uniform(value), got {self.background!r}")
-        if not isinstance(self.surface, Boundary) or not isinstance(self.cmb, Boundary):
-            raise TypeError("surface and cmb must be Boundary members")
+        for name in ("surface", "cmb"):
+            value = getattr(self, name)
+            if not isinstance(value, BoundaryCondition):
+                raise TypeError(f"{name} must be a BoundaryCondition instance such as FreeSlip() or NoSlip(), "
+                                f"got {value!r}")
         object.__setattr__(self, "compressible", bool(self.compressible))
+
+
+@dataclass(frozen=True)
+class Terms:
+    """The terms of the equations that a formulation switches on, resolved once from
+    the flags (``terms``). Frozen and hashable; part of ``propagate.StaticPlan``.
+
+    Attributes
+    ----------
+    self_gravity
+        FULL: the entries ``a(3,6) = a(4,5) = -rho0 / rho_s`` of A (eq. 5.1), the
+        ``rho_c phi`` term at the CMB (eq. 8.4, 8.5) and the ``rho_w phi`` term of the
+        surface topography (eq. 8.3). False under NO_SELF_GRAVITY (eq. 5.2).
+    anelastic
+        TALA: the term ``kappa_h K`` of the interval exponent (eq. 4.3, 12.2) and the
+        closed-form step across a jump pair (eq. 12.3).
+    surface, cmb
+        The boundary classes (``BoundaryCondition``).
+    """
+
+    self_gravity: bool
+    anelastic: bool
+    surface: BoundaryCondition
+    cmb: BoundaryCondition
+
+
+def terms(formulation: Formulation) -> Terms:
+    """Resolve the flags of a formulation into the term record of the solver."""
+    return Terms(self_gravity=formulation.gravity is GravityModel.FULL,
+                 anelastic=formulation.compressible,
+                 surface=formulation.surface, cmb=formulation.cmb)
 
 
 @dataclass(frozen=True)
@@ -169,19 +313,21 @@ def degree_one_options(formulation: Formulation, consistent_core: bool) -> Frame
     """The static frame table of equations.md 10(f), from the flags only.
 
     No numerical value of the profile enters (CONVENTIONS 5): only the gravity model,
-    the background, the boundary classes and whether the core is consistent
-    (``core_mass is None``). The table is the port of ``reference_mpmath.frame_options``:
+    the background, the attribute ``traction_free`` of the two boundary classes and
+    whether the core is consistent (``core_mass is None``). The table is the port of
+    ``reference_mpmath.frame_options``:
 
-    - FULL, hydrostatic, free slip at both, consistent core: the raw system is
-      singular for every mantle density (10a); CM only, CM default;
+    - FULL, hydrostatic, both boundaries traction-free, consistent core: the raw
+      system is singular for every mantle density (10a); CM only, CM default;
     - the same with a split core: CM default, raw offered;
-    - FULL, hydrostatic, a no-slip boundary: the anchor carries no net force (10a),
-      so degree 1 is refused by default; raw on explicit request for a split core;
+    - FULL, hydrostatic, a boundary with a tangential traction (no slip): the anchor
+      carries no net force (10a), so degree 1 is refused by default; raw on explicit
+      request for a split core;
     - NO_SELF_GRAVITY or a uniform background: a background field takes the net
       force, raw only (lovejx anchor convention).
     """
     free_body = formulation.gravity is GravityModel.FULL and isinstance(formulation.background, Hydrostatic)
-    both_free = formulation.surface is Boundary.FREE_SLIP and formulation.cmb is Boundary.FREE_SLIP
+    both_free = formulation.surface.traction_free and formulation.cmb.traction_free
     CM, RAW = DegreeOneFrame.CENTRE_OF_MASS, DegreeOneFrame.RAW
     if free_body and both_free:
         if consistent_core:

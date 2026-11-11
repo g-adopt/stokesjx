@@ -88,7 +88,9 @@ def test_interval_steps_against_oracle(table_name):
     cfg = sj.StokesConfig(lmax=100)
     plan = propagate.static_plan(p.structure, cfg)
     eta_s = 1e19
-    Zu, Zd = (np.asarray(a) for a in propagate.interval_steps(p, jnp.asarray(eta_s), plan, cfg))
+    # Jitted: the eager op-by-op Pade pair takes about 2 s, the compiled one 0.2 s.
+    steps = jax.jit(propagate.interval_steps, static_argnames=("plan", "config"))
+    Zu, Zd = (np.asarray(a) for a in steps(p, jnp.asarray(eta_s), plan=plan, config=cfg))
     eta = np.asarray(p.eta)
     e = 0.5 * (eta[1:] + eta[:-1]) / eta_s
     D = np.stack([np.ones_like(e), np.ones_like(e), e, e, e, e], axis=-1)       # (n, 6)
@@ -143,7 +145,8 @@ def test_cmb_basis_conditions():
     """``y1 = 0``, ``y4 = 0`` and ``y6 = l y5 - c_c (y3 + rho_c / rho_s y5)`` (eq. 8.1,
     8.5) for every column; rank 3."""
     c_c, rc_rel = 3.37, 9900.0 / 4500.0
-    Y = np.asarray(boundary.cmb_basis(DEGREES, c_c, rc_rel, formulation=sj.Formulation()))   # (L, 6, 3)
+    Y = np.asarray(boundary.cmb_basis(DEGREES, c_c, rc_rel, terms=sj.formulation.terms(sj.Formulation()),
+                                      radius=3480e3, eta_ref=1e22))                       # (L, 6, 3)
     l = np.asarray(DEGREES, float)
     assert np.all(Y[:, 0, :] == 0) and np.all(Y[:, 3, :] == 0)
     rows = np.zeros((len(l), 6))
@@ -169,7 +172,8 @@ def test_surface_basis_conditions(frame):
     if frame is sj.DegreeOneFrame.CENTRE_OF_MASS:
         expected[0] = -1.0
     assert np.array_equal(a, expected)
-    Y = np.asarray(boundary.surface_basis(DEGREES, c_s, a, formulation=sj.Formulation()))
+    Y = np.asarray(boundary.surface_basis(DEGREES, c_s, a, terms=sj.formulation.terms(sj.Formulation()),
+                                          radius=6370e3, eta_ref=1e22))
     assert np.all(Y[:, 0, :] == 0) and np.all(Y[:, 3, :] == 0)
     rows = np.zeros((len(l), 6))
     rows[:, 5], rows[:, 4], rows[:, 2] = 1.0, a, c_s
@@ -189,9 +193,10 @@ def test_degree_one_options_against_oracle(combo):
     """The static frame table for all 32 flag combinations and both core models
     against ``reference_mpmath.frame_options`` (reads flags only)."""
     sg, bg, comp, surf, cmb, consistent = combo
+    bc = {"free_slip": sj.FreeSlip(), "no_slip": sj.NoSlip()}
     form = sj.Formulation(gravity=sj.GravityModel.FULL if sg == "full" else sj.GravityModel.NO_SELF_GRAVITY,
                           background=sj.Hydrostatic() if bg == "hydrostatic" else sj.Uniform(9.81),
-                          compressible=comp, surface=sj.Boundary(surf), cmb=sj.Boundary(cmb))
+                          compressible=comp, surface=bc[surf], cmb=bc[cmb])
     table = cases.t_hager(reduced=True, core="consistent" if consistent else "split")
     ref = ro.frame_options(table, ro.Physics(self_gravity=sg, background=bg, compressible=comp,
                                               surface=surf, cmb=cmb))
@@ -210,12 +215,15 @@ def test_degree_one_options_against_oracle(combo):
             assert resolve_degree_one(form, consistent, sj.DegreeOneFrame(req)).value == expected
 
 
-def test_config_refuses_chunk3_values():
-    """``StokesConfig`` refuses the flag values of chunk 3; ``Formulation`` accepts them."""
-    for form in (sj.Formulation(gravity=sj.GravityModel.NO_SELF_GRAVITY), sj.Formulation(compressible=True),
-                 sj.Formulation(surface=sj.Boundary.NO_SLIP), sj.Formulation(cmb=sj.Boundary.NO_SLIP)):
-        with pytest.raises(NotImplementedError, match="c3-flags"):
-            sj.StokesConfig(lmax=4, formulation=form)
+def test_config_accepts_every_flag():
+    """``StokesConfig`` accepts all 32 flag combinations; the refusals that stay are
+    CODE-A's frame in the high layer, ``lmax = 0`` and an unknown node solver."""
+    for sg, bg, comp, surf, cmb in itertools.product(
+            (sj.GravityModel.FULL, sj.GravityModel.NO_SELF_GRAVITY), (sj.Hydrostatic(), sj.Uniform(9.81)),
+            (False, True), (sj.FreeSlip(), sj.NoSlip()), (sj.FreeSlip(), sj.NoSlip())):
+        form = sj.Formulation(gravity=sg, background=bg, compressible=comp, surface=surf, cmb=cmb)
+        cfg = sj.StokesConfig(lmax=4, formulation=form)
+        assert cfg.formulation == form and hash(cfg) == hash(sj.StokesConfig(lmax=4, formulation=form))
     with pytest.raises(ValueError):
         sj.StokesConfig(lmax=4, degree_one=sj.DegreeOneFrame.LEGACY_GEOID_ZERO)
     with pytest.raises(ValueError):

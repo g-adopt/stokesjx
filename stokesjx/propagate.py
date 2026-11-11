@@ -25,7 +25,7 @@ section 16; PLAN 3.2):
 4. Node solve. At every node, ``[-Q_up, Q_dn] (a, b) = S_l J_j`` (the jump in ``z``), for
    all degrees and nodes in one batched 6x6 solve with row equilibration.
 
-Viscosity scale (D1 of the chunk 2 plan). The state uses ``eta_s = eta_ref``, the
+Viscosity scale (NOTES/chunks/c2-forward-core/01-plan.md, D1). The state uses ``eta_s = eta_ref``, the
 largest node viscosity, through ``lax.stop_gradient``. The kernels do not depend on the
 scale in exact arithmetic (equations.md section 11), so the derivative at a fixed scale
 is the total derivative up to rounding, and the ``max`` needs no derivative where two
@@ -51,7 +51,7 @@ import numpy as np
 from jax import lax
 
 from . import boundary, linalg, system
-from .formulation import DegreeOneFrame, Formulation, Hydrostatic, Uniform, resolve_degree_one
+from .formulation import DegreeOneFrame, Formulation, Hydrostatic, Terms, Uniform, resolve_degree_one, terms
 from .kernels import Kernels, StokesConfig
 from .profile import NodeStructure, RadialProfile, mantle_mass
 from .units import Units
@@ -70,17 +70,26 @@ class Discretisation:
     degree_one_geoid_zero
         CODE-A's degree-1 frame: the raw solve with the degree-1 geoid set to zero
         (driver.f:282-284). Needs the raw frame to be offered (a uniform background).
+    kappa_rule
+        The TALA term of an interval (``system.kappa_widths``): ``"log_slope"``
+        (stokesjx, eq. 12.2) or ``"legacy_one_sided"``, CODE-A's one-sided slope at the
+        upper node times the width (``kappaindex = 1``, driver.f:429-430). The legacy
+        rule divides by the radial gap of an interval, so ``static_plan`` refuses it on
+        a structure with jump pairs.
 
     ``kernels.stokes_kernels`` passes no ``Discretisation``, so the high layer cannot
-    reach either switch.
+    reach any of these switches.
     """
 
     material: Literal["interval_mean", "upper_node"] = "interval_mean"
     degree_one_geoid_zero: bool = False
+    kappa_rule: Literal["log_slope", "legacy_one_sided"] = "log_slope"
 
     def __post_init__(self):
         if self.material not in ("interval_mean", "upper_node"):
             raise ValueError(f"unknown material rule {self.material!r}")
+        if self.kappa_rule not in ("log_slope", "legacy_one_sided"):
+            raise ValueError(f"unknown kappa rule {self.kappa_rule!r}")
 
 
 @dataclass(frozen=True)
@@ -107,7 +116,16 @@ class StaticPlan:
     node_solver
         Method of the batched node solve (``Numerics.node_solver``).
     rho_max
-        ``Numerics.rho0_max / rho_s``, the static density limit of the Pade bound.
+        ``Numerics.rho0_max / rho_s``, the static density limit of the Pade bound;
+        0 under NO_SELF_GRAVITY, where the exponent has no density entry.
+    terms
+        The term record of the formulation (``formulation.terms``): gravity level,
+        TALA and the two boundary classes.
+    kappa_rule
+        The TALA rule of an interval (``Discretisation.kappa_rule``).
+    kappa_h_max
+        ``Numerics.kappa_h_max`` under TALA, else 0: the static limit of ``|kappa_h|`` on
+        an ordinary interval in the Pade bound.
     """
 
     degrees: tuple[int, ...]
@@ -119,6 +137,9 @@ class StaticPlan:
     material: str
     node_solver: str
     rho_max: float
+    terms: Terms
+    kappa_rule: str
+    kappa_h_max: float
 
 
 @functools.lru_cache(maxsize=256)
@@ -131,10 +152,17 @@ def static_plan(structure: NodeStructure, config: StokesConfig,
        to be offered. A refused frame removes degree 1 from the degrees.
     2. ``a_l = l + 1``, and ``-1`` at ``l = 1`` in the CM frame (eq. 8.2, 10.5).
     3. The geoid mask (0 at ``l = 1`` in the CM frame and in CODE-A's frame).
-    4. The Pade plan from the per-interval norm bound of the construction widths and the
-       density limit ``Numerics.rho0_max / rho_s`` (D5, CONVENTIONS 2).
+    4. The term record of the flags (``formulation.terms``).
+    5. The Pade plan from the column-wise norm bound
+       (``linalg.balanced_norm_bound_intervals``) of the construction widths, the
+       density limit ``Numerics.rho0_max / rho_s`` (0 under NO_SELF_GRAVITY) and, under
+       TALA, the limit ``Numerics.kappa_h_max`` of ``|kappa_h|`` on every ordinary
+       interval (zero at a pair, whose step is the closed form of eq. 12.3;
+       CONVENTIONS 2).
 
-    Raises ``ValueError`` for a frame that the static rule does not offer.
+    Raises ``ValueError`` for a frame that the static rule does not offer, and for
+    CODE-A's one-sided TALA rule on a structure with jump pairs (it divides by the
+    radial gap of an interval).
     """
     form = config.formulation
     request = config.degree_one
@@ -152,13 +180,20 @@ def static_plan(structure: NodeStructure, config: StokesConfig,
     mask = np.ones(len(degrees))
     if frame_at_one in (DegreeOneFrame.CENTRE_OF_MASS, DegreeOneFrame.LEGACY_GEOID_ZERO):
         mask[0] = 0.0
-    rho_max = config.numerics.rho0_max / config.units.density_scale
-    bound = linalg.balanced_norm_bound_intervals(degrees[-1], structure.width_bounds, 0.0, rho_max)
+    term_record = terms(form)
+    rho_max = config.numerics.rho0_max / config.units.density_scale if term_record.self_gravity else 0.0
+    kappa_h_max = config.numerics.kappa_h_max if term_record.anelastic else 0.0
+    if term_record.anelastic and discretisation.kappa_rule == "legacy_one_sided" and structure.pairs:
+        raise ValueError("the one-sided kappa rule of CODE-A divides by the radial gap of an interval and is "
+                         f"undefined at the jump pairs {structure.pairs}; use kappa_rule='log_slope'")
+    bound = linalg.balanced_norm_bound_intervals(degrees[-1], structure.width_bounds,
+                                                 kappa_h_max * structure.interval_mask, rho_max)
     return StaticPlan(degrees=degrees, frame=frame_at_one,
                       potential_coefficient=tuple(float(a) for a in a_l),
                       geoid_mask=tuple(float(m) for m in mask), pade=linalg.pade_plan(bound),
                       pairs=structure.pairs, material=discretisation.material,
-                      node_solver=config.numerics.node_solver, rho_max=rho_max)
+                      node_solver=config.numerics.node_solver, rho_max=rho_max, terms=term_record,
+                      kappa_rule=discretisation.kappa_rule, kappa_h_max=kappa_h_max)
 
 
 def reference_viscosity(eta, rule) -> jax.Array:
@@ -198,14 +233,26 @@ def interval_steps(profile: RadialProfile, eta_ref, plan: StaticPlan,
     ``Z_down[i - 1] = D_i E_i^-1 D_i^-1`` carries it back, with ``E_i`` and ``E_i^-1``
     the Pade pair of the balanced exponent (``system.balanced_exponent``). The steps do
     not depend on the gravity (F1): a derivative with respect to ``g`` never passes
-    through the exponential. At a pair the width is a static zero, the exponent is zero
-    and both steps are the identity exactly.
+    through the exponential. At a pair the width is a static zero and the exponent is
+    zero, so the Pade pair is the identity exactly; incompressible, that is the pair
+    step. Under TALA (``plan.terms.anelastic``) the exponent of an ordinary interval
+    gains ``kappa_h K(1)`` (``system.kappa_widths``, eq. 12.2), and the step and the
+    inverse step of a pair gain the closed-form terms of eq. 12.3
+    (``system.anelastic_pair_terms``), added before the viscosity similarity, so the
+    pair uses the interval-mean viscosity of its two nodes.
     """
     rho_s = config.units.density_scale
-    h = system.interval_widths(profile.radius, profile.structure)
+    structure = profile.structure
+    h = system.interval_widths(profile.radius, structure)
     eta_bar, rho_bar = system.interval_material(profile.eta, profile.rho0, plan.material)
-    B = system.balanced_exponent(plan.degrees, rho_bar / rho_s, h, None, self_gravity=True)
+    kappa_h = None
+    if plan.terms.anelastic:
+        kappa_h = system.kappa_widths(profile.radius, profile.rho0, structure, plan.kappa_rule)
+    B = system.balanced_exponent(plan.degrees, rho_bar / rho_s, h, kappa_h, self_gravity=plan.terms.self_gravity)
     E, E_inv = linalg.expm_pade_pair(B, plan.pade.order, plan.pade.squarings)
+    if plan.terms.anelastic and structure.pairs:
+        dE, dE_inv = system.anelastic_pair_terms(plan.degrees, profile.rho0, structure)
+        E, E_inv = E + dE, E_inv + dE_inv
     e_rel = eta_bar / eta_ref
     to_scan = lambda Z: jnp.moveaxis(system.viscosity_similarity(Z, e_rel), (0, 1), (2, 3))
     return to_scan(E), to_scan(E_inv)
@@ -312,40 +359,46 @@ def _core(profile: RadialProfile, plan: StaticPlan, config: StokesConfig, ref_ru
     global _TRACE_COUNT
     _TRACE_COUNT += 1
     units, form = config.units, config.formulation
+    term_record = plan.terms
     rho_s, pi, G = units.density_scale, units.pi, units.G
     degrees = plan.degrees
     S = system.degree_scaling(degrees)                                   # (L, 6), static
     r, rho0 = profile.radius, profile.rho0
     R, rc = r[-1], r[0]
 
-    # Scales and background (stage 1 and 2 of the plan, section 4).
+    # Scales and background.
     eta_ref = reference_viscosity(profile.eta, ref_rule)
     g = background_gravity(profile, form, units)
     g_R, g_c = g[-1], g[0]
     c_s = 4.0 * pi * G * R * rho_s / g_R
     c_c = 4.0 * pi * G * rc * rho_s / g_c
 
-    # Interval steps of all degrees (stages 3 to 6).
+    # Interval steps of all degrees.
     Z_up, Z_down = interval_steps(profile, eta_ref, plan, config)
 
-    # Boundary bases and output rows, converted to z = S y (stage 7): a basis vector
-    # maps by S, a row by S^-1.
-    Yc = boundary.cmb_basis(degrees, c_c, profile.core_density / rho_s, formulation=form)
-    Ys = boundary.surface_basis(degrees, c_s, np.asarray(plan.potential_coefficient), formulation=form)
+    # Boundary bases and output rows, converted to z = S y: a basis vector
+    # maps by S, a row by S^-1. The boundary classes enter through
+    # tangential_unknown with parameter=None: FreeSlip and NoSlip have no parameter. A
+    # class with a traced parameter (a later partial slip) passes its profile leaf here
+    # and nowhere else (formulation.BoundaryCondition).
+    Yc = boundary.cmb_basis(degrees, c_c, profile.core_density / rho_s, terms=term_record, radius=rc,
+                            eta_ref=eta_ref, parameter=None)
+    Ys = boundary.surface_basis(degrees, c_s, np.asarray(plan.potential_coefficient), terms=term_record,
+                                radius=R, eta_ref=eta_ref, parameter=None)
     ws = boundary.surface_functionals(degrees, R=R, g_R=g_R, rho_top=profile.rho_top,
                                       rho_w=profile.outer_density, rho_s=rho_s, eta_ref=eta_ref, c_s=c_s,
-                                      geoid_mask=np.asarray(plan.geoid_mask), formulation=form)
+                                      geoid_mask=np.asarray(plan.geoid_mask), terms=term_record)
     wc = boundary.cmb_functional(r_c=rc, g_c=g_c, rho_cmb=rho0[0], rho_c=profile.core_density,
-                                 rho_s=rho_s, eta_ref=eta_ref, formulation=form)
+                                 rho_s=rho_s, eta_ref=eta_ref, terms=term_record)
     start_up = S[:, :, None] * Yc
     start_down = S[:, :, None] * Ys
     row_up = (wc[None, :] / S)[:, None, :]
     rows_down = ws / S[:, None, :]
 
-    # The two sweeps (stages 8 to 10).
+    # The two sweeps.
     sweep = sweeps(Z_up, Z_down, start_up, start_down, row_up, rows_down)
 
-    # Jumps in z and the node solve (stages 11 to 13).
+    # Jumps in z and the node solve.
     J = system.jump_vectors(r, g, eta_ref, units)                        # (N, 6)
     cmb, surface = solve_nodes_and_outputs(sweep, J[:, None, :] * S[None], plan)
 
@@ -368,49 +421,92 @@ def _core(profile: RadialProfile, plan: StaticPlan, config: StokesConfig, ref_ru
 _core_jit = jax.jit(_core, static_argnames=("plan", "config", "ref_rule"))
 
 
-def _is_concrete(profile: RadialProfile) -> bool:
-    """True when no leaf of the profile is a tracer."""
-    return not any(isinstance(x, jax.core.Tracer) for x in jax.tree_util.tree_leaves(profile))
+def _concrete_leaves(profile: RadialProfile) -> dict:
+    """The leaves of a profile whose values the host can read, as numpy arrays.
+
+    A leaf is left out when it is a JAX tracer (inside ``jit``, ``grad``, ``vmap``) or
+    ``None``. Each value check of ``check_profile`` runs when the leaves that it reads
+    are here, independent of the other leaves: in an HMC over the viscosity, ``eta`` is
+    traced while ``rho0`` and the radius are concrete, and the checks of ``rho0`` and of
+    the interval widths still run.
+    """
+    out = {}
+    for k in ("radius", "rho0", "eta", "core_density", "core_mass", "outer_density", "surface_density"):
+        v = getattr(profile, k)
+        if v is not None and not isinstance(v, jax.core.Tracer):
+            out[k] = np.asarray(v)
+    return out
 
 
 def check_profile(profile: RadialProfile, plan: StaticPlan, config: StokesConfig) -> None:
-    """Value checks of a concrete profile (D5); under a trace nothing can be checked.
+    """Value checks of the concrete leaves of a profile; a traced leaf cannot be checked.
 
     Raises ``ValueError`` when a value is not finite, a viscosity is not positive,
-    ``rho0`` exceeds ``Numerics.rho0_max``, ``rho0`` at the CMB equals ``rho_c`` or the top
-    density equals ``rho_w`` (a zero density contrast of a boundary deflection), the
-    radius does not have the structure, or the widths make the static Pade plan
-    invalid (scaled norm above the accuracy threshold or a denominator that is not
-    diagonally dominant).
+    ``rho0`` is not positive (the logarithm of the TALA term, eq. 12.2, and the density
+    contrasts) or exceeds ``Numerics.rho0_max`` (under FULL, where the density enters
+    the Pade bound), ``rho0`` at the CMB equals ``rho_c`` or the top density equals
+    ``rho_w`` (a zero density contrast of a boundary deflection), the radius does not
+    have the structure, ``|kappa_h|`` on an ordinary interval exceeds
+    ``Numerics.kappa_h_max`` under TALA, or the widths (and under TALA the actual
+    ``kappa_h``) make the static Pade plan invalid (scaled norm above the accuracy
+    threshold or a denominator that is not diagonally dominant).
+
+    Each check runs when the leaves that it reads are concrete (``_concrete_leaves``).
     """
-    leaves = {k: np.asarray(getattr(profile, k)) for k in
-              ("radius", "rho0", "eta", "core_density", "core_mass", "outer_density", "surface_density")
-              if getattr(profile, k) is not None}
+    leaves = _concrete_leaves(profile)
     for k, v in leaves.items():
         if not np.all(np.isfinite(v)):
             raise ValueError(f"{k} has a value that is not finite")
-    if np.any(leaves["eta"] <= 0):
+    if "eta" in leaves and np.any(leaves["eta"] <= 0):
         raise ValueError("every viscosity must be positive")
-    if np.max(leaves["rho0"]) > config.numerics.rho0_max:
-        raise ValueError(f"rho0 reaches {np.max(leaves['rho0'])} kg/m^3, above Numerics.rho0_max = "
-                         f"{config.numerics.rho0_max} kg/m^3, the limit of the static Pade plan")
-    r = leaves["radius"]
-    if np.any(np.diff(r) < 0):
-        raise ValueError("the radius must be non-decreasing")
-    pairs = tuple(int(i) for i in np.nonzero(r[1:] == r[:-1])[0] + 1)
-    if pairs != profile.structure.pairs:
-        raise ValueError(f"the radius has the pairs {pairs}, the structure {profile.structure.pairs}")
-    if leaves["rho0"][0] == leaves["core_density"]:
-        raise ValueError("rho0 at the CMB equals the core density: the CMB deflection has no density contrast")
-    rho_top = leaves.get("surface_density", leaves["rho0"][-1])
-    if rho_top == leaves["outer_density"]:
+    rho0 = leaves.get("rho0")
+    if rho0 is not None:
+        if np.any(rho0 <= 0):
+            raise ValueError("every reference density rho0 must be positive")
+        if plan.rho_max > 0 and np.max(rho0) > config.numerics.rho0_max:
+            raise ValueError(f"rho0 reaches {np.max(rho0)} kg/m^3, above Numerics.rho0_max = "
+                             f"{config.numerics.rho0_max} kg/m^3, the limit of the static Pade plan")
+        if "core_density" in leaves and rho0[0] == leaves["core_density"]:
+            raise ValueError("rho0 at the CMB equals the core density: the CMB deflection has no density contrast")
+    if "surface_density" in leaves:
+        rho_top = leaves["surface_density"]
+    elif profile.surface_density is None and rho0 is not None:
+        rho_top = rho0[-1]
+    else:
+        rho_top = None
+    if rho_top is not None and "outer_density" in leaves and rho_top == leaves["outer_density"]:
         raise ValueError("the topography density equals the outer density: the surface deflection has no "
                          "density contrast")
-    h = np.log1p(np.diff(r) / r[:-1]) * profile.structure.interval_mask
-    x = linalg.balanced_norm_bound_intervals(plan.degrees[-1], h, 0.0, plan.rho_max) / 2.0 ** plan.pade.squarings
-    if x > linalg.PADE_THETA[plan.pade.order] or linalg.pade_denominator_margin(plan.pade.order, x) <= 0:
-        raise ValueError(f"the interval widths of this radius give a scaled norm {x:.3f} outside the static "
-                         f"Pade plan {plan.pade}; build the profile with a structure of wider bounds")
+    r = leaves.get("radius")
+    mask = profile.structure.interval_mask
+    if r is not None:
+        if np.any(np.diff(r) < 0):
+            raise ValueError("the radius must be non-decreasing")
+        pairs = tuple(int(i) for i in np.nonzero(r[1:] == r[:-1])[0] + 1)
+        if pairs != profile.structure.pairs:
+            raise ValueError(f"the radius has the pairs {pairs}, the structure {profile.structure.pairs}")
+    # The TALA term of every ordinary interval, where the leaves that it reads are
+    # concrete; otherwise its static limit enters the Pade check below.
+    kappa_h = plan.kappa_h_max * mask
+    if plan.terms.anelastic and rho0 is not None and (r is not None or plan.kappa_rule == "log_slope"):
+        if plan.kappa_rule == "log_slope":
+            kappa_h = np.log(rho0[1:] / rho0[:-1]) * mask
+        else:
+            kappa_h = (r[1:] / rho0[1:]) * (rho0[1:] - rho0[:-1]) / (r[1:] - r[:-1]) \
+                * np.log1p(np.diff(r) / r[:-1]) * mask
+        worst = float(np.max(np.abs(kappa_h))) if kappa_h.size else 0.0
+        if worst > plan.kappa_h_max:
+            i = int(np.argmax(np.abs(kappa_h)))
+            raise ValueError(f"|kappa_h| = |ln(rho0_i / rho0_(i-1))| reaches {worst:.4f} on the interval {i + 1} "
+                             f"(nodes {i} and {i + 1}), above Numerics.kappa_h_max = {plan.kappa_h_max}, the static "
+                             "limit of the Pade plan under TALA. Put a density jump at a jump pair (two nodes "
+                             "of equal radius), where its step is exact, or raise Numerics.kappa_h_max")
+    if r is not None:
+        h = np.log1p(np.diff(r) / r[:-1]) * mask
+        x = linalg.balanced_norm_bound_intervals(plan.degrees[-1], h, kappa_h, plan.rho_max) / 2.0 ** plan.pade.squarings
+        if x > linalg.PADE_THETA[plan.pade.order] or linalg.pade_denominator_margin(plan.pade.order, x) <= 0:
+            raise ValueError(f"the interval widths of this radius give a scaled norm {x:.3f} outside the static "
+                             f"Pade plan {plan.pade}; build the profile with a structure of wider bounds")
 
 
 def solve(profile: RadialProfile, config: StokesConfig, discretisation: Discretisation = Discretisation(),
@@ -434,14 +530,13 @@ def solve(profile: RadialProfile, config: StokesConfig, discretisation: Discreti
     -------
     ``Kernels``.
 
-    The static plan is built on the host (cached), a concrete profile is checked
-    (``check_profile``), and one jitted core with the plan and the config as static
-    arguments computes the arrays.
+    The static plan is built on the host (cached), the concrete leaves of the profile
+    are checked (``check_profile``), and one jitted core with the plan and the config as
+    static arguments computes the arrays.
     """
     if not isinstance(profile, RadialProfile):
         raise TypeError(f"profile must be a RadialProfile, got {type(profile).__name__}")
     plan = static_plan(profile.structure, config, discretisation)
-    if _is_concrete(profile):
-        check_profile(profile, plan, config)
+    check_profile(profile, plan, config)
     out = _core_jit(profile, plan, config, _reference_viscosity)
     return Kernels(degrees=plan.degrees, degree_one_frame=plan.frame, radius=profile.radius, **out)

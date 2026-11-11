@@ -60,7 +60,7 @@ CONTRAST_TOL = 1e-11
 # and 6.4e-14 (wide10) with the package; same cause as CONTRAST_TOL. Logged.
 IMBALANCE_ATOL_CONTRAST = 1e-11
 # The "no loss with degree" criterion at l in {50, 100, 150, 200} of the lmax = 200
-# solves (measured at most 6.6e-15).
+# solves (measured at most 9.2e-15).
 HIGH_DEGREE_TOL = 1e-12
 # Rows of the lmax = 50, 100 and 200 solves (Pade order 9 with 0, 1, 2 squarings)
 # against each other, e_l. Cause: the rounding of a different number of squarings.
@@ -303,7 +303,7 @@ def _end_nodes(table, sol):
 
 @pytest.mark.xdist_group("hager4_full")
 def test_invariant_end_nodes_full_table():
-    """End-node values (eq. 7.2) on the full hager4 table at lmax = 100."""
+    """End-node values (eq. 7.2) on the full hager4 table at lmax = 200."""
     table = cases.t_hager()
     _end_nodes(table, _solve_table(table, 200))
 
@@ -316,7 +316,9 @@ def test_invariant_viscosity_scale(name):
     for o in ("geoid", "surface_topography", "cmb_topography"):
         assert_rows_close(b[o], a[o], SCALE_TOL, o)
     assert_rows_close(7 * b["surface_velocity"], a["surface_velocity"], SCALE_TOL, "velocity")
-    assert_rows_close(b["degree_one_imbalance"][None], a["degree_one_imbalance"][None], SCALE_TOL, "imbalance")
+    # The imbalance has an absolute rounding error that does not scale with its size
+    # (IMBALANCE_ATOL), so it is compared absolutely.
+    assert np.max(np.abs(b["degree_one_imbalance"] - a["degree_one_imbalance"])) <= IMBALANCE_ATOL
 
 
 @pytest.mark.parametrize("name", _grouped(list(REDUCED)))
@@ -327,8 +329,9 @@ def test_invariant_density_scale(name):
     a = _solve_table(table, LMAX_INV)
     for rho_s in (1000.0, 1e4):
         b = _solve_table(table, LMAX_INV, units=sj.Units(density_scale=rho_s))
-        for o in SI_OUTPUTS + ("degree_one_imbalance",):
-            assert_rows_close(np.atleast_2d(b[o]), np.atleast_2d(a[o]), SCALE_TOL, f"rho_s={rho_s} {o}")
+        for o in SI_OUTPUTS:
+            assert_rows_close(b[o], a[o], SCALE_TOL, f"rho_s={rho_s} {o}")
+        assert np.max(np.abs(b["degree_one_imbalance"] - a["degree_one_imbalance"])) <= IMBALANCE_ATOL
 
 
 @pytest.mark.parametrize("name", _grouped(list(REDUCED)))
@@ -340,8 +343,9 @@ def test_invariant_reference_viscosity(name):
     big = 1000 * max(float(e) for e in table.eta)
     for rule in ("geometric_mean", big):
         b = _solve_table(table, LMAX_INV, rule=rule)
-        for o in SI_OUTPUTS + ("degree_one_imbalance",):
-            assert_rows_close(np.atleast_2d(b[o]), np.atleast_2d(a[o]), SCALE_TOL, f"{rule} {o}")
+        for o in SI_OUTPUTS:
+            assert_rows_close(b[o], a[o], SCALE_TOL, f"{rule} {o}")
+        assert np.max(np.abs(b["degree_one_imbalance"] - a["degree_one_imbalance"])) <= IMBALANCE_ATOL
 
 
 def _total_potential_over_g(sol, table):

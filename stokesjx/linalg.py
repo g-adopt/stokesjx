@@ -1,6 +1,6 @@
 """Small batched linear algebra for the propagator solver.
 
-The primitives of chunk 1 (``benchmarks/candidates.py``), as package code: the Pade
+The primitives measured in ``benchmarks/candidates.py``, as package code: the Pade
 pair of the interval exponentials with its static plan, the elimination solver of the
 Pade denominators with its derivative rule, the three-column Gram-Schmidt of the
 sweeps with its triangular factor, the right triangular solve of the carried output
@@ -15,7 +15,7 @@ batch-first arrays ``(*batch, 6, k)``: the scan carry is small, and a transpose 
 other layout costs more than it saves there (CONVENTIONS 3).
 
 No function here has a default for the Pade order, the squaring count or the solver
-(JAX review r3 of chunk 1, minor 8): the order and the count must come from
+(NOTES/chunks/c1-foundations/04-review-jax-r3.md, minor 8): the order and the count must come from
 ``pade_plan`` with a static norm bound, because nothing can check them under ``jit``.
 """
 
@@ -74,7 +74,8 @@ def _solve_elimination_plain(A, B):
     reason is reverse mode through the derivative rule of ``solve_elimination``: JAX
     transposes the tangent solve ``dB -> A^-1 dB``, and the transpose exists only when
     the operations on ``B`` are linear in ``B`` by their structure, which an augmented
-    array that mixes ``A`` and ``B`` would hide (JAX review r3 of chunk 1, section 5).
+    array that mixes ``A`` and ``B`` would hide (NOTES/chunks/c1-foundations/04-review-jax-r3.md,
+    section 5).
     """
     n = A.shape[0]
     shape = (n,) + (1,) * (A.ndim - 2)
@@ -152,7 +153,7 @@ def _pade_coefficients(p: int) -> list[float]:
 #: Pade orders that ``pade_plan`` chooses from. Order 13 is not offered: with the
 #: elimination solver the dominance condition ``N_m(x) < 2`` binds at a scaled norm
 #: of 1.406 for order 13 against 1.416 for order 9, so order 9 always needs fewer
-#: products and order 13 is never selected (JAX review r3 of chunk 1, minor 3).
+#: products and order 13 is never selected (NOTES/chunks/c1-foundations/04-review-jax-r3.md).
 PADE_ORDERS = (6, 7, 9)
 
 #: Accuracy thresholds of the scaled 1-norm per order. The relative backward error of
@@ -238,7 +239,7 @@ def pade_plan(norm_bound: float) -> PadePlan:
     For each order of ``PADE_ORDERS`` the squaring count comes from
     ``pade_squarings``. The plan takes the order with the fewest 6x6 products for the
     pair and, between orders of equal cost, the higher order (smaller backward error).
-    Measured plans (D5 of the chunk 2 plan): ``lmax = 50`` on 129 LEBEDEV nodes has the
+    Measured plans (NOTES/chunks/c2-forward-core/01-plan.md, D5): ``lmax = 50`` on 129 LEBEDEV nodes has the
     bound 1.054 and order 9 without squaring; ``lmax = 100`` has 2.024 and order 9
     with one squaring; ``lmax = 200`` has 3.964 and order 9 with two squarings."""
     if not (norm_bound >= 0 and math.isfinite(norm_bound)):
@@ -255,13 +256,36 @@ def pade_plan(norm_bound: float) -> PadePlan:
 
 
 def balanced_norm_bound_intervals(lmax: int, h_bound, kappa_h_bound, rho_max) -> float:
-    """Upper bound of the 1-norm of the balanced exponent ``B`` (eq. 4.6) over the
-    degrees ``1..lmax``, interval by interval:
-    ``max_i ((3 lmax + 10 + rho_max_i) h_i + 4 |kappa_h|_i)`` (CONVENTIONS 2).
+    """Upper bound of the 1-norm of the balanced exponent
+    ``B = S_l (A(1, d) h + K(1) kappa_h) S_l^-1`` (eq. 4.6, 12.2) over the degrees
+    ``1..lmax``, interval by interval, column by column (CONVENTIONS 2):
 
-    The largest column sum of ``S_l A(1) S_l^-1`` is below ``3 l + 10`` for every
-    ``l >= 1``; the density entries add at most ``rho0 / rho_s``; the balanced K term
-    (TALA, chunk 3) has the column sum ``2 + 2/l``, at most 4.
+        max_i max( (3 lmax + 10 + rho_max_i) h_i,
+                   12 h_i + 4 k_i,
+                   (lmax + 5 + 6/lmax) h_i + (2 + 2/lmax) k_i )
+
+    with ``k_i = |kappa_h|_i``. The 1-norm is the largest column sum of ``|B|``, and the
+    column sums of ``|S_l A(1, d) S_l^-1|`` are (by hand and from
+    ``system._static_exponent_parts``): column 1 ``l + 5 + 6/l``; column 2
+    ``3 l + 7 + 2/l``, the widest; column 3 ``l + 1``; column 4 ``3 l + 3``; column 5
+    ``l + 2 + d``; column 6 ``l + d``, with ``d = rho0 / rho_s`` (the self-gravity entries
+    sit in columns 5 and 6). ``K(1)`` has entries in column 1 only, with the balanced
+    column sum ``2 + 2/l``. So:
+
+    - the first term bounds columns 2 to 6 at every degree: each of them is at most
+      ``3 l + 10 + d`` for ``l >= 1``, and the largest ``l`` is ``lmax``;
+    - the second and third terms bound column 1, the only column with a ``K`` entry,
+      ``(l + 5 + 6/l) h + (2 + 2/l) k``. Each part is convex in ``l > 0``, so their sum is
+      convex, and its largest value over ``1 <= l <= lmax`` is at an end, ``l = 1``
+      (``12 h + 4 k``) or ``l = lmax``.
+
+    With ``k = 0`` the first term is the largest of the three for every ``lmax >= 1``
+    (``3 lmax + 10 >= 13 > 12`` and ``>= lmax + 5 + 6/lmax``), so the bound equals the
+    incompressible bound ``(3 lmax + 10 + rho_max) h`` bit for bit. With ``rho_max = 0``
+    (NO_SELF_GRAVITY, no density entries) it bounds the matrix that the solver uses.
+    At ``l = 1`` the column-1 term is attained, so in float64 the computed 1-norm can
+    exceed the bound by one rounding (2.2e-16 relative), which the Pade thresholds
+    absorb.
 
     Parameters
     ----------
@@ -269,13 +293,18 @@ def balanced_norm_bound_intervals(lmax: int, h_bound, kappa_h_bound, rho_max) ->
         Largest degree.
     h_bound, kappa_h_bound, rho_max
         Static upper limits per interval (arrays or scalars that broadcast): the width
-        in ``ln r``, ``|kappa h|`` and ``rho0 / rho_s``. Plain numpy; computed on the
-        host when the static plan is built, never under ``jit``.
+        in ``ln r``, ``|kappa h|`` (zero at a jump pair, whose TALA step is the closed
+        form of eq. 12.3, and zero for the incompressible model) and
+        ``rho0 / rho_s`` (zero under NO_SELF_GRAVITY). Plain numpy; computed on the host
+        when the static plan is built, never under ``jit``.
     """
     h = np.asarray(h_bound, dtype=float)
     kh = np.abs(np.asarray(kappa_h_bound, dtype=float))
     rho = np.asarray(rho_max, dtype=float)
-    return float(np.max((3 * lmax + 10 + rho) * h + 4 * kh))
+    widest = (3 * lmax + 10 + rho) * h
+    column1_low = 12.0 * h + 4.0 * kh
+    column1_high = (lmax + 5 + 6.0 / lmax) * h + (2.0 + 2.0 / lmax) * kh
+    return float(np.max(np.maximum(widest, np.maximum(column1_low, column1_high))))
 
 
 def _pade_even_odd(X, order: int):
@@ -358,7 +387,7 @@ def gram_schmidt3(Z):
     about ``1 / sqrt(eps)`` (Giraud, Langou and Rozloznik 2005), which the sweeps never
     approach: they re-orthonormalise after every interval. CGS2 was measured 3 x
     faster than LAPACK QR inside the scan (CONVENTIONS 14), and, with the largest node
-    viscosity as the viscosity scale, as accurate (D1 of the chunk 2 plan).
+    viscosity as the viscosity scale, as accurate (NOTES/chunks/c2-forward-core/01-plan.md, D1).
     """
     v1 = Z[..., :, 0]
     r11 = jnp.sqrt(_dot(v1, v1))
@@ -476,9 +505,11 @@ def solve_nodes(M, b, method: str):
     method
         ``"lapack"``: ``jnp.linalg.solve`` (LU with partial pivoting, one LAPACK call
         per matrix). ``"pivot_elimination"``: Gauss-Jordan with partial pivoting on
-        batch-last arrays with the derivative rule ``dX = A^-1 (dB - dA X)``
-        (measured 1.24 against 1.93 ms forward at the size (51, 128) in the JAX review
-        r3 of chunk 1).
+        batch-last arrays with the derivative rule ``dX = A^-1 (dB - dA X)``. Through
+        the whole solver the elimination is 5 to 7 % faster in the forward map and
+        equal or slower in the gradients, and its gradient compiles in about 1.0 s
+        against 0.74 s (129 nodes, ``lmax = 50``; ``benchmarks/bench_forward.py``,
+        NOTES/benchmarks.md), so ``Numerics`` defaults to ``"lapack"``.
 
     Returns
     -------

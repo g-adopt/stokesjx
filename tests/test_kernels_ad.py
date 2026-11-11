@@ -96,22 +96,31 @@ def _kernels(profile, cfg):
 class Case:
     """A control map ``x -> profile`` with the functional ``F`` (a weighted sum of the
     four kernels, each divided by its largest absolute value at the base point) and
-    the normalised kernel map ``G`` of the dot-product test."""
+    the normalised kernel map ``G`` of the dot-product test.
 
-    def __init__(self, p0, lmax, to_profile, x0, outputs=(0, 1, 2, 3)):
-        self.cfg = sj.StokesConfig(lmax=lmax)
+    ``formulation`` and ``numerics`` set the flags and the numerical options of the
+    configuration (defaults: the default flags, so the c2 cases do not change). An
+    output whose base value is zero everywhere (the velocity under a no-slip surface)
+    has the scale 0 and is left out of ``F`` and ``G`` (``self.active``); the case
+    records it in ``self.zero_outputs``, and the test asserts that it is exactly zero."""
+
+    def __init__(self, p0, lmax, to_profile, x0, outputs=(0, 1, 2, 3), formulation=None, numerics=None):
+        self.cfg = sj.StokesConfig(lmax=lmax, formulation=formulation or sj.Formulation(),
+                                   numerics=numerics or sj.Numerics())
         self.to_profile = to_profile
         self.x0 = x0
         K0 = [np.asarray(k) for k in _kernels(to_profile(x0), self.cfg)]
         self.K0 = K0
         self.scales = tuple(float(np.max(np.abs(k))) for k in K0)
+        self.active = tuple(o for o in range(4) if self.scales[o] > 0)
+        self.zero_outputs = tuple(o for o in range(4) if self.scales[o] == 0)
         rng = np.random.default_rng(WEIGHT_SEED)
         self.weights = tuple(jnp.asarray(rng.standard_normal(k.shape)) for k in K0)
-        self.outputs = outputs
+        self.outputs = tuple(o for o in outputs if o in self.active)
 
     def G(self, x):
         K = _kernels(self.to_profile(x), self.cfg)
-        return tuple(K[o] / self.scales[o] for o in range(4))
+        return tuple(K[o] / self.scales[o] for o in self.active)
 
     def F(self, x, outputs=None):
         K = _kernels(self.to_profile(x), self.cfg)
@@ -259,10 +268,12 @@ def test_t6_shift_velocity():
     assert_jvp_vjp(lambda s: case.G(s), case.x0, rtol=DOT_RTOL)
 
 
+@pytest.mark.slow
 @pytest.mark.taylor_required
 def test_t7_golden_table():
     """T7: log eta per node on the LEBEDEV table of the hager4_fsfs golden run (129
-    nodes), lmax = 50, 0.1 N(0, 1)."""
+    nodes), lmax = 50, 0.1 N(0, 1). In the slow set (5.5 s; the quick-set budget of
+    CONVENTIONS 7), as the c2 plan (risk R6) foresaw."""
     t = cases.golden_table("hager4_fsfs")
     table = replace(t, core_mass=cases.PREM_CORE_MASS)
     case = _log_eta_case(table, 50)
@@ -317,6 +328,241 @@ def test_t11b_consistent_core_radius():
     p0 = profile_from_table(table)
     case = Case(p0, 20, lambda x: p0.replace(radius=x), np.asarray(p0.radius))
     _smooth_case(case, _pair_direction(table, 5000.0, 11))
+
+
+# ---------------------------------------------------------------------------
+# Taylor cases of the flags and the fields (T12 to T18;
+# NOTES/chunks/c3-flags-fields/01-plan.md, section 6).
+# ---------------------------------------------------------------------------
+
+
+def _all_controls(table, p0, seed=13):
+    """The control map of ``log eta``, ``rho0`` and the radius together, and its
+    direction: ``0.1 N(0, 1)`` in ``log eta``, ``50 N(0, 1)`` kg/m^3 in ``rho0``,
+    ``5000 N(0, 1)`` m per distinct radius (both nodes of a pair together), from the
+    seeds ``seed`` and ``seed + 1``."""
+    x0 = dict(log_eta=np.log(np.asarray(p0.eta)), rho0=np.asarray(p0.rho0), radius=np.asarray(p0.radius))
+    rng = np.random.default_rng(seed)
+    dx = dict(log_eta=0.1 * rng.standard_normal(x0["log_eta"].shape),
+              rho0=50.0 * rng.standard_normal(x0["rho0"].shape),
+              radius=_pair_direction(table, 5000.0, seed + 1))
+    to_profile = lambda x: p0.replace(eta=jnp.exp(x["log_eta"]), rho0=x["rho0"], radius=x["radius"])
+    return to_profile, x0, dx
+
+
+@pytest.mark.taylor_required
+def test_t12_tala_rho0():
+    """T12: ``rho0`` per node under TALA on the reduced PREM table (density jumps at three
+    pairs), lmax = 20, 50 N(0, 1) kg/m^3: the new paths of the TALA term
+    (``kappa_h = ln(rho0_i / rho0_(i-1))``) and of the closed-form pair step."""
+    table = cases.t_prem(reduced=True)
+    p0 = profile_from_table(table)
+    case = Case(p0, 20, lambda x: p0.replace(rho0=x), np.asarray(p0.rho0),
+                formulation=sj.Formulation(compressible=True))
+    _smooth_case(case, 50.0 * np.random.default_rng(12).standard_normal(case.x0.shape))
+
+
+@pytest.mark.taylor_required
+def test_t13_no_self_gravity_uniform():
+    """T13: NO_SELF_GRAVITY with ``Uniform(9.81)`` (the G-ADOPT level; the uniform
+    background and the raw frame at ``l = 1``), ``log eta``, ``rho0`` and the radius
+    together, reduced hager4, lmax = 20."""
+    table = cases.t_hager(reduced=True)
+    p0 = profile_from_table(table)
+    to_profile, x0, dx = _all_controls(table, p0)
+    form = sj.Formulation(gravity=sj.GravityModel.NO_SELF_GRAVITY, background=sj.Uniform(9.81))
+    case = Case(p0, 20, to_profile, x0, formulation=form)
+    assert sj.stokes_kernels(p0, case.cfg).degree_one_frame is sj.DegreeOneFrame.RAW
+    _smooth_case(case, dx)
+
+
+@pytest.mark.taylor_required
+def test_t14_tala_no_slip():
+    """T14: FULL, hydrostatic, TALA, no slip at both boundaries (degree 1 refused,
+    degrees 2 to 20; the velocity is an exact zero and is left out of F and G), ``log
+    eta``, ``rho0`` and the radius together, reduced PREM, lmax = 20."""
+    table = cases.t_prem(reduced=True)
+    p0 = profile_from_table(table)
+    to_profile, x0, dx = _all_controls(table, p0)
+    form = sj.Formulation(compressible=True, surface=sj.NoSlip(), cmb=sj.NoSlip())
+    case = Case(p0, 20, to_profile, x0, formulation=form)
+    assert case.zero_outputs == (3,) and np.all(case.K0[3] == 0)
+    assert sj.stokes_kernels(p0, case.cfg).degrees == tuple(range(2, 21))
+    _smooth_case(case, dx)
+    g = jax.jit(jax.grad(lambda x: jnp.sum(_kernels(to_profile(x), case.cfg)[3])))(x0)
+    for k, v in g.items():
+        assert np.all(np.asarray(v) == 0), k
+
+
+@pytest.mark.slow
+@pytest.mark.taylor_required
+def test_t15_field_misfit():
+    """T15: ``log eta`` and the radius together through the field misfit
+    ``0.5 sum_(o, l >= 2, m, C/S) ((F_o - F1_o) / s_o)^2`` of ``apply`` with a fixed random
+    ``real_4pi`` density ``(N, 2, 21, 21)`` and the fields ``F1`` of a second viscosity
+    profile; the radius moves the quadrature weights too. Reduced hager4, lmax = 20.
+
+    Direction ``0.01 N(0, 1)`` in ``log eta`` and ``500 N(0, 1)`` m in the radius, a tenth
+    of the amplitudes of the other cases: along the larger direction the misfit is
+    strongly curved compared with its slope (uncorrected rate 1.25 on the first window
+    pair, outside (0.8, 1.2); NOTES/chunks/c3-flags-fields/plan-review-r2-evidence/
+    t15_detail.out), the same cause as T2 (CONVENTIONS 8, NOTES/TOLERANCES.md). In the
+    slow set: the third move of the quick-set rule of
+    NOTES/chunks/c3-flags-fields/01-plan.md (risk R1)."""
+    table = cases.t_hager(reduced=True)
+    p0 = profile_from_table(table)
+    cfg = sj.StokesConfig(lmax=20)
+    N = p0.structure.n_nodes
+    rng = np.random.default_rng(15)
+    density = jnp.asarray(rng.standard_normal((N, 2, 21, 21)) * np.tril(np.ones((21, 21))))
+    x0 = dict(log_eta=np.log(np.asarray(p0.eta)), radius=np.asarray(p0.radius))
+    to_profile = lambda x: p0.replace(eta=jnp.exp(x["log_eta"]), radius=x["radius"])
+
+    def fields_of(x):
+        p = to_profile(x)
+        F = sj.apply(sj.stokes_kernels(p, cfg), density, p)
+        return [getattr(F, n)[:, 2:, :] for n in sj.fields.FIELD_NAMES]
+    x1 = dict(log_eta=x0["log_eta"] + 0.3 * rng.standard_normal(N), radius=x0["radius"])
+    F1 = [np.asarray(f) for f in fields_of(x1)]
+    scales = [float(np.max(np.abs(f))) for f in F1]
+
+    def misfit(x):
+        return 0.5 * sum(jnp.sum(((f - f1) / s) ** 2) for f, f1, s in zip(fields_of(x), F1, scales))
+    dx = dict(log_eta=0.01 * rng.standard_normal(N), radius=_pair_direction(table, 500.0, 16))
+    results = assert_taylor(misfit, x0, dx)
+    for res in results:
+        assert assess(remeasure_taylor(res, NEG_BIAS * res.derivative))[0] == "fail", res.table()
+    rel = assert_jvp_vjp(misfit, x0, rtol=DOT_RTOL)
+    print(f"T15 dot product {rel:.2e}")
+
+
+_ALL_FORMS = [sj.Formulation(gravity=g, background=b, compressible=c, surface=s, cmb=m)
+              for g in (sj.GravityModel.FULL, sj.GravityModel.NO_SELF_GRAVITY)
+              for b in (sj.Hydrostatic(), sj.Uniform(9.81)) for c in (False, True)
+              for s in (sj.FreeSlip(), sj.NoSlip()) for m in (sj.FreeSlip(), sj.NoSlip())]
+
+
+# T16: the smallest admissible second-order term of the combined direction, as a
+# fraction of the largest second-order term of its three control components (log eta,
+# rho0, radius), measured by second differences of F (no derivative of the code under
+# test). Below it the direction is degenerate for a rate test (see test_t16).
+T16_CURVATURE_MIN = 0.05
+
+
+def _second_difference(F, x0, dx, step=2.5e-3):
+    """``|F(x + s dx) + F(x - s dx) - 2 F(x)|``: about ``|d^2F[dx, dx]| s^2``."""
+    shift = lambda a: jax.tree_util.tree_map(lambda x, d: x + a * d, x0, dx)
+    return abs(float(F(shift(step))) + float(F(shift(-step))) - 2.0 * float(F(x0)))
+
+
+def _curved_direction(F, table, p0, k):
+    """The direction of T16 for combination ``k``: the first of the seeds
+    ``1000 + 2k + 100 j`` (``j = 0, 1, ...``) whose second-order term is at least
+    ``T16_CURVATURE_MIN`` times the largest second-order term of its components."""
+    for j in range(10):
+        seed = 1000 + 2 * k + 100 * j
+        _, x0, dx = _all_controls(table, p0, seed=seed)
+        whole = _second_difference(F, x0, dx)
+        parts = max(_second_difference(F, x0, {c: (v if c == name else 0.0 * v) for c, v in dx.items()})
+                    for name in dx)
+        if whole >= T16_CURVATURE_MIN * parts:
+            return dx, seed, whole / parts
+    raise AssertionError(f"no direction with a second-order term above {T16_CURVATURE_MIN} of its components")
+
+
+@pytest.mark.slow
+@pytest.mark.taylor_required
+@pytest.mark.parametrize("k", range(32))
+def test_t16_every_combination(k):
+    """T16: each of the 32 flag combinations, ``log eta``, ``rho0`` and the radius
+    together, reduced PREM, lmax = 10.
+
+    Direction rule, fixed before the run (CONVENTIONS 8; NOTES/TOLERANCES.md). With one
+    random direction for all 32, the second-order terms of the three controls can
+    cancel along it: on combination 9 (FULL, uniform ``g``, free-slip surface, no-slip
+    CMB) each control alone gives a corrected remainder of about 1e-6 at the first rung
+    and the three together 7.6e-10, so the third-order term (and at smaller steps the
+    rounding) dominates the window and the rates fail although the derivative is
+    correct (the dot product passes; NOTES/chunks/c3-flags-fields/impl-evidence/
+    t16_case9.out). Over ten seeds such a cancellation below 1e-2 happens for 1 of 70
+    directions (t16_seeds.out), so it is an accident of one direction, not a property of
+    a combination. The rule skips a direction whose second-order term is below
+    ``T16_CURVATURE_MIN`` of the largest of its components (``_curved_direction``),
+    judged by second differences of the forward values only; the Taylor test, the 1.01
+    controls and the dot product then run unchanged on the chosen direction."""
+    table = cases.t_prem(reduced=True)
+    p0 = profile_from_table(table)
+    to_profile, x0, _ = _all_controls(table, p0)
+    case = Case(p0, 10, to_profile, x0, formulation=_ALL_FORMS[k])
+    for o in case.zero_outputs:
+        assert np.all(case.K0[o] == 0)
+    dx, seed, ratio = _curved_direction(case.F, table, p0, k)
+    print(f"T16 combination {k}: seed {seed}, curvature ratio {ratio:.2e}")
+    _smooth_case(case, dx)
+
+
+# The dot product of the degree-one imbalance, absolute: the imbalance is a ratio of
+# two forces of order one computed from a small difference (tests/test_kernels_oracle.py,
+# IMBALANCE_ATOL), so its directional derivative has an absolute rounding error. Measured
+# 4e-15 absolute by the JAX review r1 of c2
+# (NOTES/chunks/c2-forward-core/impl-review-jax-r1-evidence/chk_imbalance_dot.py).
+IMBALANCE_DOT_ATOL = 1e-13
+
+
+@pytest.mark.slow
+@pytest.mark.taylor_required
+def test_t17_degree_one_imbalance():
+    """T17: ``degree_one_imbalance`` (CM frame, split core, default flags) along ``log
+    eta``, ``rho0`` and the radius together, reduced PREM, lmax = 1: Taylor test of a
+    weighted sum and the dot product with an absolute bound."""
+    table = cases.t_prem(reduced=True)
+    p0 = profile_from_table(table)
+    to_profile, x0, dx = _all_controls(table, p0)
+    cfg = sj.StokesConfig(lmax=1)
+    imb = lambda x: sj.stokes_kernels(to_profile(x), cfg).degree_one_imbalance
+    i0 = np.asarray(imb(x0))
+    assert np.max(np.abs(i0)) > 1e-4                       # a nonzero applied field
+    w = jnp.asarray(np.random.default_rng(17).standard_normal(i0.shape))
+    F = lambda x: jnp.sum(w * imb(x)) / np.max(np.abs(i0))
+    results = assert_taylor(F, x0, dx)
+    for res in results:
+        assert assess(remeasure_taylor(res, NEG_BIAS * res.derivative))[0] == "fail", res.table()
+    dy = jnp.asarray(np.random.default_rng(18).standard_normal(i0.shape))
+    a = float(jnp.vdot(dy, jax.jit(lambda x, d: jax.jvp(imb, (x,), (d,))[1])(x0, dx)))
+    jt = jax.jit(lambda x, c: jax.vjp(imb, x)[1](c)[0])(x0, dy)
+    b = sum(float(np.vdot(np.asarray(jt[k]), dx[k])) for k in dx)
+    print(f"T17 dot product: {a:.6e} {b:.6e}, absolute {abs(a - b):.2e}")
+    assert abs(a - b) <= IMBALANCE_DOT_ATOL, (a, b)
+
+
+# The pivoted elimination against LAPACK through stokes_kernels, e_l per kernel and
+# degree: both solve the same equilibrated node systems; measured 4.2e-15 and 6.5e-15 on
+# the benchmark tables (NOTES/chunks/c2-forward-core/03-implementation.md). Cause: the
+# rounding of two different eliminations.
+NODE_SOLVER_TOL = 1e-13
+# The gradient of T1 with both solvers, max-normalised. Cause: the same, through the
+# reverse pass.
+NODE_SOLVER_GRAD_TOL = 1e-12
+
+
+@pytest.mark.slow
+@pytest.mark.taylor_required
+def test_t18_pivot_elimination():
+    """T18: ``node_solver="pivot_elimination"`` through ``stokes_kernels`` (reduced hager4,
+    lmax = 20): the values against ``"lapack"``, the Taylor test of T1, and the gradient
+    of T1 against ``"lapack"``."""
+    table = cases.t_hager(reduced=True)
+    p0 = profile_from_table(table)
+    to_profile = lambda x: p0.replace(eta=jnp.exp(x))
+    x0 = np.log(np.asarray(p0.eta))
+    piv = Case(p0, 20, to_profile, x0, numerics=sj.Numerics(node_solver="pivot_elimination"))
+    lap = Case(p0, 20, to_profile, x0)
+    for o in range(4):
+        assert_rows_close(piv.K0[o], lap.K0[o], NODE_SOLVER_TOL, f"pivot vs lapack {o}")
+    _smooth_case(piv, 0.1 * np.random.default_rng(1).standard_normal(x0.shape))
+    gp = np.asarray(jax.jit(jax.grad(piv.F))(x0))
+    gl = np.asarray(jax.jit(jax.grad(lap.F))(x0))
+    assert np.max(np.abs(gp - gl)) <= NODE_SOLVER_GRAD_TOL * np.max(np.abs(gl))
 
 
 # ---------------------------------------------------------------------------
