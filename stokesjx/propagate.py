@@ -42,6 +42,7 @@ again.
 from __future__ import annotations
 
 import functools
+import warnings
 from dataclasses import dataclass
 from typing import Literal, NamedTuple
 
@@ -53,7 +54,7 @@ from jax import lax
 from . import boundary, linalg, system
 from .formulation import DegreeOneFrame, Formulation, Hydrostatic, Terms, Uniform, resolve_degree_one, terms
 from .kernels import Kernels, StokesConfig
-from .profile import NodeStructure, RadialProfile, mantle_mass
+from .profile import NodeStructure, RadialProfile, check_cut_leaf, mantle_mass
 from .units import Units
 
 
@@ -126,6 +127,14 @@ class StaticPlan:
     kappa_h_max
         ``Numerics.kappa_h_max`` under TALA, else 0: the static limit of ``|kappa_h|`` on
         an ordinary interval in the Pade bound.
+    tala_cut_across_pair
+        ``True`` when the formulation is TALA and a jump pair of the structure lies
+        strictly inside the range of a viscosity cut (NOTES/docs/equations.md section 19):
+        the kernels then jump when the cut crosses a pair with a density jump, and
+        ``solve`` warns on every call. The structure holds no ``rho0``, so the field is
+        also ``True`` for a viscosity-only pair, where nothing jumps. The last field, with
+        the default ``False``: the plan of every structure without cuts compares and
+        hashes as before, and the field does not enter the jitted core.
     """
 
     degrees: tuple[int, ...]
@@ -140,6 +149,20 @@ class StaticPlan:
     terms: Terms
     kappa_rule: str
     kappa_h_max: float
+    tala_cut_across_pair: bool = False
+
+
+#: The text of the ``RuntimeWarning`` of ``solve`` when a viscosity cut can cross a jump
+#: pair under TALA (``StaticPlan.tala_cut_across_pair``). The numbers are the measured
+#: energy error of one crossing for an HMC over the cut radius (NOTES/PLAN.md section 3.3;
+#: the c4b plan 6.3, t_prem, 1e22 | 1e21 Pa s across the boundary, lmax 50).
+TALA_CUT_WARNING = (
+    "under TALA the kernels jump when a viscosity cut crosses a pair with a density jump (rho0 differs between "
+    "the two members of the pair); a pair with equal rho0 gives no jump. The jump equals a displacement of the "
+    "boundary by about 10 km at a viscosity contrast of 10 (20 to 30 km at small contrasts), so one crossing "
+    "of an HMC trajectory over this radius costs about that displacement over the posterior standard deviation "
+    "of the radius in nat (1.0 to 1.5 nat at 10 km for 1e22 | 1e21 Pa s). To avoid it, end the movable range at "
+    "the density pair (stokesjx.controls.Layers, 'TALA and a density jump inside a range')")
 
 
 @functools.lru_cache(maxsize=256)
@@ -161,9 +184,20 @@ def static_plan(structure: NodeStructure, config: StokesConfig,
        CONVENTIONS 2). With ``structure.limits`` (a table with movable boundaries) the
        widths are the widened limits (``NodeStructure.width_bounds``).
 
+    6. ``tala_cut_across_pair``: under TALA, whether a jump pair lies strictly inside the
+       range of a viscosity cut (``structure.cuts``). The plan only records it; the
+       warning is issued by ``solve`` on every call, because this function is cached and
+       a warning here would come on a cache miss only.
+
+    The sub-steps of a viscosity cut need no change of the Pade plan: each part of a cut
+    interval is narrower than the interval (its fraction of the width is at most
+    ``1 + 2 eps``), so the bound of the construction widths covers it.
+
     Raises ``ValueError`` for a frame that the static rule does not offer, for
     CODE-A's one-sided TALA rule on a structure with jump pairs (it divides by the
-    radial gap of an interval), and for ``structure.limits`` beyond the static limits
+    radial gap of an interval), for a structure with viscosity cuts under CODE-A's
+    material rule or CODE-A's TALA rule (both exist for the comparison with the Fortran
+    only), and for ``structure.limits`` beyond the static limits
     of ``Numerics``: ``limits.rho0_max > rho0_max`` under FULL, or ``limits.kappa_h >
     kappa_h_max`` on an ordinary interval under TALA. These two checks replace, for the
     moved nodes, the value checks that ``check_profile`` cannot run on a traced radius
@@ -188,9 +222,22 @@ def static_plan(structure: NodeStructure, config: StokesConfig,
     term_record = terms(form)
     rho_max = config.numerics.rho0_max / config.units.density_scale if term_record.self_gravity else 0.0
     kappa_h_max = config.numerics.kappa_h_max if term_record.anelastic else 0.0
+    if structure.cuts and discretisation.material != "interval_mean":
+        raise ValueError("a viscosity cut splits an interval of the interval-mean material rule (eq. 12.1); "
+                         f"CODE-A's material rule {discretisation.material!r} is for the Fortran comparison only")
+    if structure.cuts and term_record.anelastic and discretisation.kappa_rule != "log_slope":
+        raise ValueError("a viscosity cut shares kappa_h of the log-slope rule (eq. 12.2) between its two parts; "
+                         f"CODE-A's TALA rule {discretisation.kappa_rule!r} is for the Fortran comparison only")
     if term_record.anelastic and discretisation.kappa_rule == "legacy_one_sided" and structure.pairs:
         raise ValueError("the one-sided kappa rule of CODE-A divides by the radial gap of an interval and is "
                          f"undefined at the jump pairs {structure.pairs}; use kappa_rule='log_slope'")
+    # Under TALA a jump pair strictly inside a cut range: the step of the pair takes the
+    # viscosity of its two members (eq. 12.3), which changes side when the cut passes the
+    # pair, so the kernels jump there (equations.md section 19). The pair of interval i
+    # has the nodes i - 1 and i; strictly inside the range (lo, hi) means lo < i - 1 and
+    # i < hi.
+    tala_cut_across_pair = bool(term_record.anelastic and any(
+        lo < i - 1 and i < hi for lo, hi in structure.cuts for i in structure.pairs))
     limits = structure.limits
     if limits is not None:
         # A table whose nodes move under a trace (controls.Layers): the value checks of
@@ -217,7 +264,8 @@ def static_plan(structure: NodeStructure, config: StokesConfig,
                       geoid_mask=tuple(float(m) for m in mask), pade=linalg.pade_plan(bound),
                       pairs=structure.pairs, material=discretisation.material,
                       node_solver=config.numerics.node_solver, rho_max=rho_max, terms=term_record,
-                      kappa_rule=discretisation.kappa_rule, kappa_h_max=kappa_h_max)
+                      kappa_rule=discretisation.kappa_rule, kappa_h_max=kappa_h_max,
+                      tala_cut_across_pair=tala_cut_across_pair)
 
 
 def reference_viscosity(eta, rule) -> jax.Array:
@@ -272,6 +320,25 @@ def interval_steps(profile: RadialProfile, eta_ref, plan: StaticPlan,
     inverse step of a pair gain the closed-form terms of eq. 12.3
     (``system.anelastic_pair_terms``), added before the viscosity similarity, so the
     pair uses the interval-mean viscosity of its two nodes.
+
+    Viscosity cuts (``profile.structure.cuts``, a static branch: a structure without cuts
+    runs the code above unchanged; NOTES/docs/equations.md section 19). The interval
+    ``a`` that holds cut ``q`` (``system.cut_intervals``) is split at ``c_q`` into a
+    lower part of width ``h_lo`` with the viscosity ``e_lo = eta[a] / eta_ref`` and an
+    upper part of width ``h_hi`` with ``e_hi = eta[a + 1] / eta_ref``. Both parts keep the
+    material of the whole interval (its interval-mean ``rho0``, and under TALA its
+    ``kappa_h``), so their balanced exponents are the fractions ``h_lo / h_a`` and
+    ``h_hi / h_a`` of the interval exponent ``B_a``. The step of the interval becomes
+
+        Z_cut = D(e_hi) expm(f_hi B_a) D(e_hi)^-1 D(e_lo) expm(f_lo B_a) D(e_lo)^-1,
+
+    and the inverse step the product of the inverses in the opposite order. The ``2 C``
+    sub-exponents join the one batched Pade call of all intervals and degrees; the
+    product is one batched 6x6 product over cuts and degrees, and the scatter at the
+    traced index ``a`` replaces the step of the cut interval (whose interval-mean
+    viscosity is not used). The sweeps, the node solve and the outputs do not change.
+    The fractions are at most ``1 + 2 eps``, so the sub-exponents stay inside the static
+    Pade bound of their interval, and ``f_lo + f_hi = 1`` up to rounding.
     """
     rho_s = config.units.density_scale
     structure = profile.structure
@@ -281,13 +348,37 @@ def interval_steps(profile: RadialProfile, eta_ref, plan: StaticPlan,
     if plan.terms.anelastic:
         kappa_h = system.kappa_widths(profile.radius, profile.rho0, structure, plan.kappa_rule)
     B = system.balanced_exponent(plan.degrees, rho_bar / rho_s, h, kappa_h, self_gravity=plan.terms.self_gravity)
+    if structure.cuts:
+        n, C = B.shape[2], len(structure.cuts)
+        a, h_lo, h_hi = system.cut_intervals(profile.radius, profile.cut_radius, structure)   # (C,) each
+        Ba = B[:, :, a]                                                                         # (6, 6, C, L)
+        # The two sub-exponents of every cut interval, appended to the batch of the
+        # interval exponents: one Pade call for n + 2 C exponents.
+        B = jnp.concatenate([B, (h_lo / h[a])[None, None, :, None] * Ba,
+                             (h_hi / h[a])[None, None, :, None] * Ba], axis=2)
     E, E_inv = linalg.expm_pade_pair(B, plan.pade.order, plan.pade.squarings)
+    if structure.cuts:
+        E_lo, E_lo_inv = E[:, :, n:n + C], E_inv[:, :, n:n + C]
+        E_hi, E_hi_inv = E[:, :, n + C:], E_inv[:, :, n + C:]
+        E, E_inv = E[:, :, :n], E_inv[:, :, :n]
     if plan.terms.anelastic and structure.pairs:
         dE, dE_inv = system.anelastic_pair_terms(plan.degrees, profile.rho0, structure)
         E, E_inv = E + dE, E_inv + dE_inv
     e_rel = eta_bar / eta_ref
-    to_scan = lambda Z: jnp.moveaxis(system.viscosity_similarity(Z, e_rel), (0, 1), (2, 3))
-    return to_scan(E), to_scan(E_inv)
+    if not structure.cuts:
+        to_scan = lambda Z: jnp.moveaxis(system.viscosity_similarity(Z, e_rel), (0, 1), (2, 3))
+        return to_scan(E), to_scan(E_inv)
+    vs = system.viscosity_similarity
+    Z, Z_inv = vs(E, e_rel), vs(E_inv, e_rel)
+    # The node viscosities on both sides of each cut: node a lies at or below the cut
+    # and node a + 1 above it (controls.Layers sets them so).
+    e_lo, e_hi = profile.eta[a] / eta_ref, profile.eta[a + 1] / eta_ref
+    product = lambda X, Y: jnp.einsum("ijcl,jkcl->ikcl", X, Y)
+    Z_cut = product(vs(E_hi, e_hi), vs(E_lo, e_lo))                 # upward: lower part first
+    Z_cut_inv = product(vs(E_lo_inv, e_lo), vs(E_hi_inv, e_hi))     # downward: upper part first
+    Z, Z_inv = Z.at[:, :, a].set(Z_cut), Z_inv.at[:, :, a].set(Z_cut_inv)
+    to_scan = lambda Z: jnp.moveaxis(Z, (0, 1), (2, 3))
+    return to_scan(Z), to_scan(Z_inv)
 
 
 class SweepResult(NamedTuple):
@@ -464,7 +555,7 @@ def _concrete_leaves(profile: RadialProfile) -> dict:
     """
     out = {}
     for k in ("radius", "rho0", "eta", "core_density", "core_mass", "outer_density", "surface_density",
-              "uniform_gravity"):
+              "uniform_gravity", "cut_radius"):
         v = getattr(profile, k)
         if v is not None and not isinstance(v, jax.core.Tracer):
             out[k] = np.asarray(v)
@@ -485,7 +576,11 @@ def check_profile(profile: RadialProfile, plan: StaticPlan, config: StokesConfig
     threshold or a denominator that is not diagonally dominant). The leaf
     ``uniform_gravity`` must be set exactly under ``Uniform(None)`` (a static check of
     the pytree structure, which also runs under a trace), and a concrete value of it
-    must be finite and positive.
+    must be finite and positive. The leaf ``cut_radius`` must be set exactly when the
+    structure has viscosity cuts, with one radius per cut (a static check, which also
+    runs under a trace); a concrete value must be finite and lie in ``[r_lo, r_hi)`` of
+    its cut range (with the concrete radius, or the construction radius of the
+    structure when the radius is traced).
 
     Each check runs when the leaves that it reads are concrete (``_concrete_leaves``).
     """
@@ -499,10 +594,20 @@ def check_profile(profile: RadialProfile, plan: StaticPlan, config: StokesConfig
     if not wants_leaf and profile.uniform_gravity is not None:
         raise ValueError(f"the profile carries uniform_gravity, which only the background Uniform(None) "
                          f"reads; the formulation has {background!r}")
+    # The cut leaf and the cuts of the structure go together (pytree structure and
+    # shapes: static, so the check runs under a trace).
+    check_cut_leaf(profile.structure, profile.cut_radius)
     leaves = _concrete_leaves(profile)
     for k, v in leaves.items():
         if not np.all(np.isfinite(v)):
             raise ValueError(f"{k} has a value that is not finite")
+    if "cut_radius" in leaves:
+        r_ref = leaves.get("radius", np.asarray(profile.structure.radius))
+        for q, (lo, hi) in enumerate(profile.structure.cuts):
+            c = float(leaves["cut_radius"][q])
+            if not r_ref[lo] <= c < r_ref[hi]:
+                raise ValueError(f"the viscosity cut {q} at {c} m lies outside its range [{r_ref[lo]}, {r_ref[hi]}) m "
+                                 f"(the nodes {lo} and {hi})")
     if "uniform_gravity" in leaves and not leaves["uniform_gravity"] > 0:
         raise ValueError(f"a uniform background gravity must be positive, got {leaves['uniform_gravity']}")
     if "eta" in leaves and np.any(leaves["eta"] <= 0):
@@ -581,10 +686,18 @@ def solve(profile: RadialProfile, config: StokesConfig, discretisation: Discreti
     The static plan is built on the host (cached), the concrete leaves of the profile
     are checked (``check_profile``), and one jitted core with the plan and the config as
     static arguments computes the arrays.
+
+    Warning: a ``RuntimeWarning`` (``TALA_CUT_WARNING``) on every call when the plan has
+    ``tala_cut_across_pair`` (TALA, and a jump pair strictly inside the range of a
+    viscosity cut). Under an outer ``jax.jit`` this function runs once per trace, so the
+    warning comes once per trace; the default filter of Python shows it once per call
+    site.
     """
     if not isinstance(profile, RadialProfile):
         raise TypeError(f"profile must be a RadialProfile, got {type(profile).__name__}")
     plan = static_plan(profile.structure, config, discretisation)
+    if plan.tala_cut_across_pair:
+        warnings.warn(TALA_CUT_WARNING, RuntimeWarning, stacklevel=2)
     check_profile(profile, plan, config)
     out = _core_jit(profile, plan, config, _reference_viscosity)
     return Kernels(degrees=plan.degrees, degree_one_frame=plan.frame, radius=profile.radius, **out)

@@ -40,9 +40,11 @@ synthesis and the Gauss-Legendre transform of lovejx. CODE-A's file formats are 
 written by ``stokesjx.io.legacy`` (imported on use).
 
 Controls (``stokesjx.controls``): ``Layers`` maps one log viscosity per layer and the
-radii of movable viscosity boundaries to a profile (the nodes of a range follow the
-boundary affinely, ``rho0`` stays where the input profile puts it, and a density anomaly
-stays on the input table through ``Layers.fields``); ``viscosity_by_node`` maps one log
+radii of movable viscosity boundaries to a profile (either the nodes of a range follow
+the boundary affinely, or the boundary is a viscosity cut of the fixed node table that
+the solver splits into two exact sub-steps and that can cross the density jumps of the
+table; ``rho0`` stays where the input profile puts it, and a density anomaly stays on
+the input table through ``Layers.fields``); ``viscosity_by_node`` maps one log
 viscosity per node; ``ControlVector`` turns a pytree of controls into one vector with a
 jitted value and gradient and a NumPy front, and ``fields.spectral_misfit`` is a weighted
 degree-power misfit. The prior and the sampler are the caller's.

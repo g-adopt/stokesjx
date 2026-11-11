@@ -10,14 +10,16 @@ The module holds two objects:
 
 ``NodeStructure``
     The static part: the construction radii, the positions of the pairs and the core
-    model (consistent or split), and for a table with movable boundaries the static
-    limits of the moved nodes (``NodeLimits``). It is frozen and hashable, it is read
+    model (consistent or split), for a table with movable boundaries the static
+    limits of the moved nodes (``NodeLimits``), and for a table with viscosity cuts the
+    node ranges of the cuts (``cuts``). It is frozen and hashable, it is read
     on the host, and it is part of the static key of every jitted solve. The Pade plan
     of the interval exponentials (``linalg.pade_plan``) is computed from its widths.
 ``RadialProfile``
-    A JAX pytree of the eight arrays that a derivative can move (radius, ``rho0``,
+    A JAX pytree of the nine arrays that a derivative can move (radius, ``rho0``,
     ``eta``, core density, core mass, water density, topography density, uniform
-    gravity), with the ``NodeStructure`` as static auxiliary data.
+    gravity, the radii of the viscosity cuts), with the ``NodeStructure`` as static
+    auxiliary data.
 
 The profile carries no gravity array. Gravity is a function of the background flag
 of the formulation, of ``rho0``, of the radius and of the core mass, and the solver
@@ -104,16 +106,74 @@ class NodeStructure:
     limits
         ``None`` (a fixed node table: every structure built by ``from_radius``), or the
         ``NodeLimits`` of a table whose nodes move with a boundary (set by
-        ``controls.Layers`` only). The last field, with the default ``None``: two
-        structures without limits compare and hash equal when their other fields are
-        equal, so the jit key and the Pade plan of a fixed node table do not depend on
-        this field.
+        ``controls.Layers`` only). With the default ``None``, two structures without
+        limits compare and hash equal when their other fields are equal, so the jit key
+        and the Pade plan of a fixed node table do not depend on this field.
+    cuts
+        ``()`` (no viscosity cut: every structure built without the keyword), or one
+        ``(lo, hi)`` per viscosity cut: the node indices of the two ends of the range in
+        which the cut can lie (NOTES/docs/equations.md section 19). A viscosity cut is a
+        viscosity jump inside one interval of this fixed node table, at the traced
+        radius ``RadialProfile.cut_radius[q]``; it is not a node pair. The solver
+        brackets the cut among the nodes ``lo .. hi`` and splits the interval that holds
+        it into two exact sub-steps (``propagate.interval_steps``). The last field, with
+        the default ``()``: every structure without cuts compares and hashes as a
+        structure of the same fields without this one, so the jit keys and the Pade
+        plans of a table without cuts do not change. Checked in ``__post_init__``:
+        ``0 <= lo < hi <= N - 1``, the cuts ascend and do not overlap (two cuts can share
+        an end node), and the first and the last interval of a range are not jump pairs
+        (the bracket of a cut outside its range is clipped to these two intervals, so
+        they must have a nonzero width).
     """
 
     radius: tuple[float, ...]
     pairs: tuple[int, ...]
     consistent_core: bool
     limits: NodeLimits | None = None
+    cuts: tuple[tuple[int, int], ...] = ()
+
+    def __post_init__(self):
+        """Check the static description of the viscosity cuts (``cuts``)."""
+        n = len(self.radius)
+        previous_hi = 0
+        for q, cut in enumerate(self.cuts):
+            if len(cut) != 2:
+                raise ValueError(f"cut {q} must be a pair (lo, hi) of node indices, got {cut!r}")
+            lo, hi = int(cut[0]), int(cut[1])
+            if not 0 <= lo < hi <= n - 1:
+                raise ValueError(f"cut {q} has the range nodes ({lo}, {hi}); they must satisfy "
+                                 f"0 <= lo < hi <= {n - 1} (the last node index)")
+            if lo < previous_hi:
+                raise ValueError(f"cut {q} with the range nodes ({lo}, {hi}) starts below the end node {previous_hi} "
+                                 "of the cut before it: the cuts must ascend and must not overlap (a shared end "
+                                 "node is allowed)")
+            # The bracket of a traced cut radius is clipped to the intervals lo .. hi - 1
+            # (system.cut_intervals); its two sub-step fractions divide by the width of
+            # the selected interval, so the end intervals must not be zero-width pairs.
+            # Every interior pair is never selected: both of its nodes have one radius and
+            # pass the comparison r_n <= c together.
+            if self.radius[lo] == self.radius[lo + 1] or self.radius[hi - 1] == self.radius[hi]:
+                raise ValueError(f"cut {q} with the range nodes ({lo}, {hi}) starts or ends on the outer member of "
+                                 "a jump pair; a range end at a pair must be its inner member")
+            previous_hi = hi
+
+    @property
+    def cut_lo(self) -> np.ndarray:
+        """``(C,)`` int numpy: the lower range node ``lo`` of every viscosity cut."""
+        return np.asarray([c[0] for c in self.cuts], dtype=int)
+
+    @property
+    def cut_hi(self) -> np.ndarray:
+        """``(C,)`` int numpy: the upper range node ``hi`` of every viscosity cut."""
+        return np.asarray([c[1] for c in self.cuts], dtype=int)
+
+    @property
+    def cut_mask(self) -> np.ndarray:
+        """``(C, N)`` bool numpy: ``True`` where node ``n`` lies in the range of cut ``q``,
+        ``lo_q <= n <= hi_q``. It restricts the bracket comparison of a cut to its own
+        range (``system.cut_intervals``)."""
+        idx = np.arange(self.n_nodes)
+        return (idx[None, :] >= self.cut_lo[:, None]) & (idx[None, :] <= self.cut_hi[:, None])
 
     @property
     def n_nodes(self) -> int:
@@ -157,12 +217,13 @@ class NodeStructure:
         return m
 
     @classmethod
-    def from_radius(cls, radius, *, consistent_core: bool) -> "NodeStructure":
-        """Structure of a concrete radius array (m, CMB first).
+    def from_radius(cls, radius, *, consistent_core: bool, cuts=()) -> "NodeStructure":
+        """Structure of a concrete radius array (m, CMB first), with the viscosity cuts
+        ``cuts`` (``((lo, hi), ...)`` node indices of the cut ranges; default none).
 
         Raises ``ValueError`` for fewer than two nodes, a radius that decreases, a
-        non-positive or non-finite radius, or three equal neighbouring radii (a pair
-        is two nodes)."""
+        non-positive or non-finite radius, three equal neighbouring radii (a pair
+        is two nodes), or cuts that ``__post_init__`` refuses."""
         r = np.asarray(radius, dtype=np.float64)
         if r.ndim != 1 or r.size < 2:
             raise ValueError("a node table needs a one-dimensional radius with at least two nodes")
@@ -173,7 +234,8 @@ class NodeStructure:
         pairs = tuple(int(i) for i in np.nonzero(r[1:] == r[:-1])[0] + 1)
         if any(b == a + 1 for a, b in zip(pairs[:-1], pairs[1:])):
             raise ValueError("three equal neighbouring radii: a jump pair has exactly two nodes")
-        return cls(radius=tuple(float(x) for x in r), pairs=pairs, consistent_core=bool(consistent_core))
+        return cls(radius=tuple(float(x) for x in r), pairs=pairs, consistent_core=bool(consistent_core),
+                   cuts=tuple((int(lo), int(hi)) for lo, hi in cuts))
 
 
 def consistent_core_mass(r_cmb, core_density, units: Units) -> jax.Array:
@@ -303,6 +365,25 @@ class RadialProfile:
         two go together: ``propagate.check_profile`` refuses ``Uniform(None)`` without
         this leaf and this leaf with any other background. ``None`` is an empty subtree,
         so a profile without the leaf keeps its leaves.
+    cut_radius
+        ``(C,)``, m, or ``None`` (default): the radii of the viscosity cuts of
+        ``structure.cuts`` (NOTES/docs/equations.md section 19), a traced leaf. For cut
+        ``q`` with the range nodes ``(lo, hi)``, the interval between the nodes ``a`` and
+        ``a + 1`` with ``r_a <= c_q < r_(a+1)`` and ``lo <= a < hi`` has the viscosity
+        ``eta[a]`` between ``r_a`` and ``c_q`` and ``eta[a + 1]`` between ``c_q`` and
+        ``r_(a+1)``; its ``rho0`` (the interval mean) and, under TALA, its ``kappa_h``
+        are those of the whole interval, shared by the two parts in proportion to their
+        widths in ``ln r``. Every other interval keeps the interval-mean rule. A cut on
+        a node (``c = r_a``) gives a zero-width lower part, whose step is the identity
+        exactly. ``controls.Layers(..., motion="cut")`` sets the leaf and the node
+        viscosities on both sides. A structure with cuts needs this leaf and a structure
+        without cuts refuses it (``ValueError``, here and in ``propagate.check_profile``,
+        also under a trace). A concrete value must be finite and lie in
+        ``[r_lo, r_hi)`` of its cut (``propagate.check_profile``); a traced value outside
+        is the caller's responsibility (the solver clips the bracket to the range, so
+        every value stays finite, but the step is then not the model above). ``None`` is
+        an empty subtree, so a profile without cuts keeps its leaves and its tree
+        definition.
     structure
         Static ``NodeStructure``. Without it, the radius must be concrete and the
         structure is built from it; with it, the radius can be traced (for a control
@@ -320,14 +401,15 @@ class RadialProfile:
     """
 
     __slots__ = ("radius", "rho0", "eta", "core_density", "core_mass", "outer_density",
-                 "surface_density", "uniform_gravity", "structure")
+                 "surface_density", "uniform_gravity", "cut_radius", "structure")
 
     def __init__(self, radius, rho0, eta, *, core_density, core_mass=None, outer_density=0.0,
-                 surface_density=None, uniform_gravity=None, structure: NodeStructure | None = None):
+                 surface_density=None, uniform_gravity=None, cut_radius=None,
+                 structure: NodeStructure | None = None):
         radius, rho0, eta = _as_f64(radius), _as_f64(rho0), _as_f64(eta)
         core_density, core_mass = _as_f64(core_density), _as_f64(core_mass)
         outer_density, surface_density = _as_f64(outer_density), _as_f64(surface_density)
-        uniform_gravity = _as_f64(uniform_gravity)
+        uniform_gravity, cut_radius = _as_f64(uniform_gravity), _as_f64(cut_radius)
         if radius.ndim != 1 or rho0.shape != radius.shape or eta.shape != radius.shape:
             raise ValueError(f"radius, rho0 and eta must be one-dimensional arrays of one shape; "
                              f"got {radius.shape}, {rho0.shape}, {eta.shape}")
@@ -339,16 +421,20 @@ class RadialProfile:
         if structure is None:
             if _is_traced(radius):
                 raise ValueError("a traced radius needs an explicit NodeStructure (structure=...)")
+            if cut_radius is not None:
+                raise ValueError("a cut_radius needs the node ranges of its cuts: pass a structure with cuts "
+                                 "(NodeStructure.from_radius(..., cuts=...))")
             structure = NodeStructure.from_radius(np.asarray(radius), consistent_core=core_mass is None)
         else:
             if structure.n_nodes != radius.shape[0]:
                 raise ValueError(f"the structure has {structure.n_nodes} nodes, the radius {radius.shape[0]}")
             if structure.consistent_core != (core_mass is None):
                 raise ValueError("core_mass is None exactly when the structure has a consistent core")
+        check_cut_leaf(structure, cut_radius)
         for name, v in (("radius", radius), ("rho0", rho0), ("eta", eta), ("core_density", core_density),
                         ("core_mass", core_mass), ("outer_density", outer_density),
                         ("surface_density", surface_density), ("uniform_gravity", uniform_gravity),
-                        ("structure", structure)):
+                        ("cut_radius", cut_radius), ("structure", structure)):
             object.__setattr__(self, name, v)
 
     def __setattr__(self, name, value):
@@ -389,15 +475,33 @@ class RadialProfile:
                 f"consistent_core={self.structure.consistent_core})")
 
 
-#: The leaves of a profile, in pytree order. ``uniform_gravity`` is the eighth child:
-#: ``None`` is an empty subtree, so a profile without it has seven array leaves, and
-#: every profile of a process has the same tree definition.
+#: The leaves of a profile, in pytree order. ``uniform_gravity`` is the eighth child and
+#: ``cut_radius`` the ninth: ``None`` is an empty subtree, so a profile without them has
+#: seven array leaves, and a profile without a cut has the tree definition of a profile
+#: built before the cut existed.
 _LEAF_NAMES = ("radius", "rho0", "eta", "core_density", "core_mass", "outer_density", "surface_density",
-               "uniform_gravity")
+               "uniform_gravity", "cut_radius")
+
+
+def check_cut_leaf(structure: NodeStructure, cut_radius) -> None:
+    """The static consistency of the cut leaf with the structure (pytree structure and
+    shapes only, so the check also runs under a trace).
+
+    ``structure.cuts`` is non-empty exactly when ``cut_radius`` is not ``None``, and then
+    ``cut_radius`` has the shape ``(len(structure.cuts),)``; otherwise ``ValueError``."""
+    if structure.cuts and cut_radius is None:
+        raise ValueError(f"the structure has {len(structure.cuts)} viscosity cut(s) and the profile no "
+                         "cut_radius; set it with replace(cut_radius=...)")
+    if not structure.cuts and cut_radius is not None:
+        raise ValueError("the profile carries a cut_radius and its structure has no viscosity cut; pass a "
+                         "structure with cuts (NodeStructure.from_radius(..., cuts=...))")
+    if cut_radius is not None and np.shape(cut_radius) != (len(structure.cuts),):
+        raise ValueError(f"cut_radius must have one radius in m per cut, shape ({len(structure.cuts)},), "
+                         f"got {np.shape(cut_radius)}")
 
 
 def _flatten(p: RadialProfile):
-    """Eight children (``None`` children are empty subtrees) and the static structure."""
+    """Nine children (``None`` children are empty subtrees) and the static structure."""
     return tuple(getattr(p, k) for k in _LEAF_NAMES), p.structure
 
 

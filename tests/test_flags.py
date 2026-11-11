@@ -561,12 +561,10 @@ def test_stored_flag_case(case_name, load_oracle):
           f"scaled norm {plan.pade.scaled_norm:.3f}")
 
 
-@pytest.mark.slow
 def test_smooth_conv_stored(load_oracle):
     """G1: ``smooth_conv``, four refinements of a smooth TALA table, the 65 stored sources
     common to all four, ``l`` in {2, 10, 30}: the stored case where the interval-mean
-    viscosity changes the result (CONVENTIONS 14). In the slow set: the first move of
-    the quick-set rule of NOTES/chunks/c3-flags-fields/01-plan.md (risk R1)."""
+    viscosity changes the result (CONVENTIONS 14)."""
     c = cases.ORACLE_CASES.by_name("smooth_conv")
     O = load_oracle("smooth_conv")
     worst = 0.0
@@ -726,11 +724,11 @@ def test_water_no_self_gravity():
 
 
 # ---------------------------------------------------------------------------
-# Slow: all 32 combinations, the consistent core, high degree and contrast.
+# All 32 combinations and the consistent core (quick set); high degree and contrast
+# (slow set, the full tier of CONVENTIONS 7).
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.slow
 @pytest.mark.parametrize("form", ALL_FORMULATIONS, ids=lambda f: str(ALL_FORMULATIONS.index(f)))
 def test_flag_all_combinations(form):
     """G2: every one of the 32 combinations on the split-core reduced PREM table, and the

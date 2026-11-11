@@ -420,14 +420,14 @@ def test_refusals(p_red):
     with pytest.raises(ValueError, match="not a node radius"):
         sj.Layers(p_red, B, movable={1: (5100e3, 5700e3)})
     with pytest.raises(ValueError, match="density jump pair"):
-        sj.Layers(p_red, B, movable={1: (5105.625e3, 5828.125e3)})
+        sj.Layers(p_red, B, movable={1: (5105.625e3, 5828.125e3)}, motion="affine")
     # On the F3 layering: overlap, an end at another movable boundary, a density jump.
     with pytest.raises(ValueError, match="overlap"):
         sj.Layers(p_red, B_F3, movable={1: (4202.5e3, 5286.25e3), 2: (5105.625e3, 5700e3)})
     with pytest.raises(ValueError, match="radius of the movable boundary"):
         sj.Layers(p_red, B_F3, movable={1: (4202.5e3, 5370e3), 2: (5105.625e3, 5700e3)})
     with pytest.raises(ValueError, match="density jump pair"):
-        sj.Layers(p_red, B_F3, movable={4: (5700e3, 6008.75e3)})
+        sj.Layers(p_red, B_F3, movable={4: (5700e3, 6008.75e3)}, motion="affine")
     with pytest.raises(ValueError, match="lies inside the movable range"):
         sj.Layers(p_red, np.array([3480, 4650, 4700, 5700, 6370]) * KM, movable={1: (4202.5e3, 5105.625e3)})
     # The positive cases: two ranges that share an end node, and two ranges that end on

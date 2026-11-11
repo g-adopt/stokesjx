@@ -50,16 +50,17 @@ include = ["stokesjx*"]
 # queue of a busy one, so a few long tests at the end of a queue do not leave the other
 # workers idle (measured 53 to 54 s against 59 to 64 s with `load` for the quick set,
 # NOTES/chunks/c4-controls-derivatives/03-implementation.md). The `xdist_group` marks of
-# the tests are kept but have no effect: pytest-xdist 3.8 under pytest 9 does not honour
-# them (`--dist loadgroup` distributes as `load` does), so tests that must share a compiled
-# program run in one test function. Without `-n` the option has no effect.
+# the tests are kept as documentation but have no effect: pytest-xdist 3.8 under pytest 9
+# does not honour them (`--dist loadgroup` distributes as `load` does). Every test is
+# independent of the others (ruling 12); module fixtures share compiled programs inside
+# one worker. Without `-n` the option has no effect.
 addopts = "-m 'not slow' --dist worksteal"
 # Ceiling on one test. `timeout_func_only` keeps fixture setup outside the
 # budget, because the first JAX compile can be slow on its own.
 timeout = 1800
 timeout_func_only = true
 markers = [
-  "slow: test that takes more than about 30 s (full-table mpmath recomputations, the Fortran regeneration)",
+  "slow: above about 30 s with -n 8 on reunion, or the full tier listed in NOTES/CONVENTIONS.md section 7",
   "heavy: quick-set test above about 2 s, listed in tests/heavy_tests.txt; the fast tier is -m \"not slow and not heavy\"",
   "legacy: needs legacy/ (the untracked CODE-A copy) and, for a rebuild, the Fortran toolchain",
   "taylor_required: fixed physical Taylor acceptance case",

@@ -214,6 +214,50 @@ def interval_widths(radius, structure: NodeStructure) -> jax.Array:
     return jnp.log1p((r[1:] - r[:-1]) / r[:-1]) * structure.interval_mask
 
 
+def cut_intervals(radius, cut_radius, structure: NodeStructure) -> tuple[jax.Array, jax.Array, jax.Array]:
+    """For every viscosity cut: the interval that holds it and the widths of its two parts
+    in ``ln r`` (NOTES/docs/equations.md section 19).
+
+    Parameters
+    ----------
+    radius
+        ``(N,)`` node radii in m (can be traced).
+    cut_radius
+        ``(C,)`` cut radii ``c_q`` in m (can be traced).
+    structure
+        Static ``NodeStructure`` with ``cuts``: the range nodes ``(lo_q, hi_q)``.
+
+    Returns
+    -------
+    ``(a, h_lo, h_hi)``, each ``(C,)``: the 0-based interval index ``a`` (the interval
+    between the nodes ``a`` and ``a + 1``, ``r_a <= c < r_(a+1)``, ``lo <= a < hi``), and
+    ``h_lo = ln(c / r_a)``, ``h_hi = ln(r_(a+1) / c)``, both as ``log1p`` of the relative
+    gap (the ratios are close to one; ``interval_widths`` explains the rounding).
+
+    One comparison of all cuts with all nodes under the static ``(C, N)`` mask of the range
+    nodes, and a count: the number ``k`` of range nodes at or below ``c`` gives
+    ``a = lo + k - 1``. The comparison ``r_n <= c`` selects, at a tie ``c = r_a``, the
+    interval above the node, with a zero-width lower part (the identity step exactly), so
+    the value and the derivative at a tie are the limits from above (the convention of the
+    upper one-sided derivative of ``controls.Layers``). Both nodes of a jump pair have one
+    radius and pass the comparison together, so a pair interval is never selected
+    inside the range. The count is clipped to ``[1, hi - lo]``: for a cut radius outside
+    ``[r_lo, r_hi)`` (a traced value that the caller did not keep inside its range) the
+    index stays on the first or the last interval of the range, whose widths are
+    nonzero (``NodeStructure.__post_init__``), and every value stays finite. No search,
+    no loop, no data-dependent shape; the count has no derivative, and the derivative
+    with respect to ``c`` and ``radius`` passes the two logarithms only.
+    """
+    r = jnp.asarray(radius, jnp.float64)
+    c = jnp.asarray(cut_radius, jnp.float64)
+    lo, hi = structure.cut_lo, structure.cut_hi
+    count = jnp.sum(structure.cut_mask & (r[None, :] <= c[:, None]), axis=1)
+    count = jnp.clip(count, 1, hi - lo)
+    a = lo + count - 1
+    ra, rb = r[a], r[a + 1]
+    return a, jnp.log1p((c - ra) / ra), jnp.log1p((rb - c) / c)
+
+
 def interval_material(eta, rho0, rule: str) -> tuple[jax.Array, jax.Array]:
     """Interval viscosity and density, ``(N - 1,)`` each.
 

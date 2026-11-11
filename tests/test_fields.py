@@ -274,15 +274,9 @@ def _fortran_field_check(run, density, F):
     return worst
 
 
-# hager4_nsfs and hager4_fsfs_tala run in the slow set: the second move of the
-# quick-set rule of NOTES/chunks/c3-flags-fields/01-plan.md (risk R1). Their kernels are
-# compared with the Fortran in the quick set (tests/test_kernels_legacy.py), and the
-# field code is the same for every run.
-_SLOW_FIELD_RUNS = ("hager4_nsfs", "hager4_fsfs_tala")
-
-
-@pytest.mark.parametrize("run", [pytest.param(r, marks=(pytest.mark.slow, pytest.mark.xdist_group(f"legacy_{r}")))
-                                 if r in _SLOW_FIELD_RUNS else legacy_group([r])[0] for r in FORTRAN_FIELD_RUNS])
+# One case per golden run. The xdist_group marks of legacy_group have no effect under the
+# installed pytest-xdist (CONVENTIONS 7); every case builds what it needs.
+@pytest.mark.parametrize("run", [legacy_group([r])[0] for r in FORTRAN_FIELD_RUNS])
 def test_fields_against_fortran(run, load_fortran):
     """G7: the four fields (three under a no-slip surface) of the synthetic density with
     the package legacy kernels, CODE-A's equal weights and sqt, against the Fortran

@@ -324,7 +324,15 @@ def stokes_kernels(profile: RadialProfile, config: StokesConfig) -> Kernels:
     the boundaries); the Pade plan is built from these limits, and a configuration whose
     limits exceed ``Numerics.rho0_max`` (FULL) or ``Numerics.kappa_h_max`` (TALA) raises
     ``ValueError`` also under a trace. A traced ``rho0`` control is not covered by these
-    limits; the caller's prior must keep it inside them.
+    limits; the caller's prior must keep it inside them. A profile with viscosity cuts
+    (``controls.Layers(..., motion="cut")``; ``NodeStructure.cuts`` and the traced leaf
+    ``RadialProfile.cut_radius``) splits the interval that holds each cut into two exact
+    sub-steps (NOTES/docs/equations.md section 19); its Pade plan is the plan of the
+    construction table. A concrete ``cut_radius`` outside its range raises; a traced one
+    is clipped to the range by the bracket and is the caller's responsibility. Under TALA
+    with a jump pair inside a cut range, this function warns on every call
+    (``RuntimeWarning``): the kernels jump when the cut crosses a pair with a density
+    jump (``controls.Layers``).
     """
     # The low layer is imported here: propagate imports this module for the
     # configuration and the kernel record.

@@ -50,3 +50,28 @@ tests/test_controls_ad.py::test_g15q_1
 tests/test_controls_ad.py::test_g16q_1
 # Chunk 4, round 1 of the implementation review: the G4 case on a wide range (5.1 s).
 tests/test_controls_ad.py::test_g4_wide_range
+# Chunk c4b (c4b-boundaries-across-jumps): the tests returned from the slow set (NOTES/PLAN.md
+# ruling 12), the new tests of tests/test_controls_cut.py, and earlier tests that measured
+# above 2 s in the quick set with -n 8 on reunion (2026-11-11, load average 5 to 34).
+tests/test_controls_ad.py::test_g15_node_surface
+tests/test_controls_ad.py::test_s_flags
+tests/test_controls_ad.py::test_s_t27_rough
+tests/test_controls_cut.py::test_c7_c10_density_map
+tests/test_controls_cut.py::test_dp4_dot_products
+tests/test_controls_cut.py::test_k3_one_sided_differences_at_r0
+tests/test_controls_cut.py::test_taylor_all_controls
+tests/test_controls_cut.py::test_taylor_radius
+tests/test_controls_cut.py::test_v1_swapped_pair
+tests/test_controls_cut.py::test_v2_v3_v3b_v4_oracle
+tests/test_controls_cut.py::test_v7_against_ck
+tests/test_controls_cut.py::test_v8_fields_against_ck
+tests/test_controls_cut.py::test_vmap_eager_jit
+tests/test_controls.py::test_construction_radius_wide_ranges
+tests/test_kernels_ad.py::test_derivative_against_oracle
+tests/test_kernels_ad.py::test_t16_every_combination
+tests/test_kernels_ad.py::test_t17_degree_one_imbalance
+tests/test_kernels_ad.py::test_t18_pivot_elimination
+tests/test_kernels_ad.py::test_t8_wide5
+tests/test_kernels_ad.py::test_t9_stiff_lid
+tests/test_linalg.py::test_solve_elimination_value_and_derivative
+tests/test_linalg.py::test_solve_nodes_pivot_derivative

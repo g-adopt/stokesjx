@@ -6,8 +6,9 @@ Taylor policy of CONVENTIONS 8, unchanged: the ladder ``1e-2 * 2^-k``, ``k = 0..
 window ``(0, 1, 2, 3)``, both direction signs, reverse and forward mode, the corrected
 rate lower bound 1.9, the uncorrected band (0.8, 1.2), "unresolved" is not a pass, and
 the derivative times 1.01 must fail for every (sign, mode). Each program (P1, P2, P3) is
-one ``TaylorProgram`` and one ``DotProgram`` shared by its cases (plan D9), so a case
-costs no new compile.
+one ``TaylorProgram`` and one ``DotProgram`` in a module fixture shared by its cases (plan
+D9): every case is its own test, and a worker that runs several cases of one program
+compiles it once.
 
 Crossing clearance (plan section 6). The derivative with respect to a movable radius
 jumps where a moved node or the pair crosses an input radius, and at the construction
@@ -289,18 +290,21 @@ def P1():
     return dict(L=L, prog=prog, c0=c0, c1=c1, cfg=cfg, d=d)
 
 
-# pytest-xdist 3.8 with pytest 9 does not honour ``xdist_group`` (the worker appends the
-# group to ``item._nodeid``, which pytest 9 no longer reads), so the cases of one program
-# run in one test function: one worker compiles the programs once.
+# Every case of a program is its own test (NOTES/PLAN.md ruling 12: independent tests that
+# pytest-xdist can distribute). The module fixture holds the compiled programs, so a
+# worker that runs several cases of one program compiles it once; a case that lands on
+# another worker compiles the program there. No case writes to its fixture.
 
 
-def test_p1(P1):
-    """P1 (plan 6.1): T19 to T24, DP1, the invariants I1 to I6, in one test so that they
-    share the compiled programs of the fixture."""
-    for case in (_t19_log_eta, _t20_radius_away_from_r0, _t21_g4_radius_at_r0, _t22_rho0, _t23_core_density,
-                 _t24_all_controls, _dp1_dot_product, _i1_i2_shift_identities, _i3_i4_i5_i6_values):
-        print(f"--- {case.__name__[1:]}")
-        case(P1)
+P1_CASES = ("_t19_log_eta", "_t20_radius_away_from_r0", "_t21_g4_radius_at_r0", "_t22_rho0", "_t23_core_density",
+            "_t24_all_controls", "_dp1_dot_product", "_i1_i2_shift_identities", "_i3_i4_i5_i6_values")
+
+
+@pytest.mark.parametrize("case", P1_CASES, ids=[c[1:] for c in P1_CASES])
+def test_p1(P1, case):
+    """P1 (plan 6.1): T19 to T24, DP1 and the invariants I1 to I6, one test per case on
+    the compiled programs of the fixture."""
+    globals()[case](P1)
 
 
 def _t19_log_eta(P1):
@@ -489,10 +493,11 @@ def P2():
     return dict(L=L, prog=Program(L, cfg, to_profile, c1, d), c1=c1)
 
 
-def test_p2(P2):
-    """P2 (plan 6.2): T25 and DP2 on one compiled program."""
-    _t25_uniform_g(P2)
-    _dp2_dot_product(P2)
+@pytest.mark.parametrize("case", ("_t25_uniform_g", "_dp2_dot_product"), ids=("t25_uniform_g", "dp2_dot_product"))
+def test_p2(P2, case):
+    """P2 (plan 6.2): T25 and DP2, one test per case on the compiled program of the
+    fixture."""
+    globals()[case](P2)
 
 
 def _t25_uniform_g(P2):
@@ -553,10 +558,11 @@ def P3():
     return _program_p3("smooth")
 
 
-def test_p3(P3):
-    """P3 (plan 6.6): T27 and DP3 on one compiled program."""
-    _t27(P3)
-    _dp3_dot_product(P3)
+@pytest.mark.parametrize("case", ("_t27", "_dp3_dot_product"), ids=("t27", "dp3_dot_product"))
+def test_p3(P3, case):
+    """P3 (plan 6.6): T27 and DP3, one test per case on the compiled program of the
+    fixture."""
+    globals()[case](P3)
 
 
 def _t27(P):
@@ -853,7 +859,11 @@ def test_g16q_3(full_tables):
 
 
 # --------------------------------------------------------------------------
-# Slow set (plan 6.5).
+# The full tier of G15 and G16 (slow set, CONVENTIONS 7): each slow test below repeats
+# the assertion of a named quick test (G15q, G16q, P1, I7) on the full table or at a
+# higher degree. The other tests of this section are quick: they hold assertions that no
+# quick test repeats (the S-pair tests, the G15 gate on the node-and-surface layout, the
+# clamp bounds against the oracle, the flags and the rough anomaly of the Taylor rows).
 # --------------------------------------------------------------------------
 
 G15_1_OFFSETS = (-150e3, -50e3, -10e3, 1e3, 50e3, 150e3)
@@ -918,7 +928,6 @@ def node_surface_layout(p):
                      movable={1: (float(r_in[70]), 5700e3), 4: (6150e3, 6370e3)})
 
 
-@pytest.mark.slow
 def test_g15_node_surface(full_tables):
     """G15 on the node-and-surface layout: the four moved fields against tables built
     at the new radii, smooth and rough anomaly, lmax 30, at three interior positions and
@@ -943,7 +952,6 @@ def test_g16_3(full_tables):
     gate_derivative(f3, ETA_F3, sj.StokesConfig(lmax=30), targets, RADIUS_DERIV_TOL, "G16-3", half=True)
 
 
-@pytest.mark.slow
 def test_s_t27_rough():
     _t27(_program_p3("rough"))
 
@@ -1002,7 +1010,6 @@ def test_s_t26_full_table(full_tables):
         assert abs(D - Dm) >= FD_KINK_MIN_FULL * abs(D)
 
 
-@pytest.mark.slow
 def test_s_g9_clamp_bounds_oracle():
     """Kernels of the reduced layering with the boundary at each clamp bound against the
     mpmath oracle of the same table (decimal strings from repr(float))."""
@@ -1063,7 +1070,6 @@ def test_s_vmap_16(full_tables):
         assert np.max(np.abs(np.asarray(gv[b]) - np.asarray(g))) <= VMAP_RTOL * np.max(np.abs(np.asarray(g)))
 
 
-@pytest.mark.slow
 def test_s_flags():
     """T19 and T20 under TALA with no slip at both boundaries (the velocity is an exact
     zero and left out of F)."""
@@ -1099,14 +1105,12 @@ def _pair_change(form):
     return max(float(np.max(row_errors(np.asarray(getattr(Kin, o)), np.asarray(getattr(K, o))))) for o in SI_OUTPUTS)
 
 
-@pytest.mark.slow
 def test_s_pair():
     e = _pair_change(sj.Formulation())
     print(f"S-pair default flags: {e:.2e}")
     assert e <= INSERTED_PAIR_BOUND
 
 
-@pytest.mark.slow
 def test_s_pair_exact():
     e = _pair_change(sj.Formulation(gravity=sj.GravityModel.NO_SELF_GRAVITY, background=sj.Uniform(9.81)))
     print(f"S-pair NO_SELF_GRAVITY, uniform g: {e:.2e}")

@@ -63,6 +63,36 @@ Also recorded: the crossing count per km in windows of 25, 50, 100 and 200 km ar
 weighted sum of the four kernels on the construction table, no density map: the kinks of
 the ``rho0`` interpolation alone). The JSON goes to ``NOTES/benchmarks/c4-kink.json``; the
 script refuses to overwrite it without ``--overwrite``.
+
+The viscosity cut (chunk c4b, NOTES/chunks/c4b-boundaries-across-jumps/01-plan.md section
+11; ``measure_cut``). Under ``Layers(..., motion="cut")`` no node moves, and the only
+crossings are the input radii inside the clamp range (``Layers.crossings``: kind 2 an input
+node, kind 4 a density-jump pair; a pair is one radius, so no grouping is needed). At every
+crossing ``c``: the one-sided derivatives and values by linear extrapolation from ``c -+ D``
+and ``c -+ 2 D`` (``D = 1 m``); ``rho = |[dN]| / |dN|``; the value jump as a displacement of
+the boundary, ``L = |[N]| / |dN|`` in m; ``E_rms`` as above (the derivative jumps only). At
+every density-jump pair strictly inside the range, the energy error of one crossing of an
+HMC trajectory from the jump of the VALUE (plan 6.3), for every ``r_true`` of the grid
+within ``1.5 sigma_r`` of the pair,
+
+    E_value(r_true) = sqrt(lam^2 ([N] . (N_mid - N(r_true)))^2 + lam |[N]|^2),
+
+with ``[N] = N(J+) - N(J-)``, ``N_mid`` their mean and ``lam`` of the likelihood above; its
+lower limit is ``sqrt(lam) |[N]| = L / sigma_r``. Tables (``--tables T1c T2c T3 T4 T3t``):
+
+- T1c, T2c: T1 and T2 with ``motion="cut"`` (no density jump inside the range);
+- T3: ``t_prem()``, boundaries 3480, 5700, 5970, 6270, 6370 km, the 5700 km boundary movable
+  in (5466.875, 5970) km (it holds the 670 km density jump; ``r0 = J``), viscosities 1e22,
+  1e21, 3e20, 1e22 Pa s, ``lmax = 50``;
+- T4: ``t_prem()``, boundaries 3480, 5800, 6270, 6370 km, movable in (5466.875, 6150) km
+  (it holds the 5700 and 5970 km jumps), 1e22, 3e20, 1e22 Pa s, ``lmax = 50``;
+- T3t: T3 under TALA at the viscosity contrasts 1.1, 3, 10 and 100 across the boundary
+  (lower-mantle viscosity ``contrast x 1e21`` Pa s; the contrast 10 is T3), names
+  ``T3t-1.1`` and so on (``T3t`` runs all four).
+
+Rule (gate G6 of the c4b plan): on T1c, T2c, T3 and T4, ``rho_max <= 1e-8``, ``E_rms <= 1e-3``
+nat and ``E_value <= 1e-6`` nat for the three anomalies and both ``sigma_r``. T3t is recorded.
+The JSON goes to ``NOTES/benchmarks/c4b-kink.json`` (``--json``).
 """
 
 from __future__ import annotations
@@ -287,6 +317,177 @@ def measure(name: str) -> dict:
     return rec
 
 
+CUT_TABLES = ("T1c", "T2c", "T3", "T4")
+RHO_C1 = 1e-8            # c4b G6: the derivative jump of an incompressible cut table
+E_RMS_CUT = 1e-3         # nat
+E_VALUE_CUT = 1e-6       # nat
+D_CUT = 1.0              # m: the extrapolation step at a crossing of a cut table
+
+
+def cut_table(name: str):
+    """``(Layers, log_eta, cfg)`` of a cut table (module docstring)."""
+    import cases
+    from adapters import profile_from_table
+    if name == "T1c":
+        p = profile_from_table(cases.t_prem())
+        r = np.asarray(p.radius)
+        L = sj.Layers(p, np.array([3480e3, 5370e3, 5700e3, 5970e3, 6270e3, 6370e3]),
+                      movable={1: (float(r[70]), 5700e3)}, motion="cut")
+        return L, np.log(np.array([3e22, 1e22, 1e21, 3e20, 1e22])), sj.StokesConfig(lmax=50)
+    if name == "T2c":
+        from bench_forward import lebedev_refined
+        L = sj.Layers(lebedev_refined(), np.array([3480e3, 5700e3, 5970e3, 6270e3, 6370e3]),
+                      movable={1: (5466.875e3, 5970e3)}, motion="cut")
+        return L, np.log(HAGER4), sj.StokesConfig(lmax=100)
+    p = profile_from_table(cases.t_prem())
+    if name == "T3" or name.startswith("T3t"):
+        L = sj.Layers(p, np.array([3480e3, 5700e3, 5970e3, 6270e3, 6370e3]), movable={1: (5466.875e3, 5970e3)})
+        contrast = 10.0 if name == "T3" else float(name.split("-")[1])
+        form = sj.Formulation(compressible=name.startswith("T3t"))
+        return L, np.log(np.array([contrast * 1e21, 1e21, 3e20, 1e22])), sj.StokesConfig(lmax=50, formulation=form)
+    if name == "T4":
+        L = sj.Layers(p, np.array([3480e3, 5800e3, 6270e3, 6370e3]), movable={1: (5466.875e3, 6150e3)})
+        return L, np.log(np.array([1e22, 3e20, 1e22])), sj.StokesConfig(lmax=50)
+    raise ValueError(name)
+
+
+def measure_cut(name: str) -> dict:
+    """Crossings, derivative jumps, value jumps, ``E_rms`` and ``E_value`` of a cut table."""
+    import warnings
+    import densities
+    warnings.filterwarnings("ignore", "under TALA the kernels jump")
+    L, log_eta, cfg = cut_table(name)
+    assert L.motion == "cut", (name, L.motion)
+    lmax = cfg.lmax
+    k_mov = int(L.movable_index[0])
+    g = L.ranges[k_mov]
+    LOW, HIGH, M = g.low, g.high, g.margin
+    r_in = np.asarray(L.input_profile.radius)
+    dens = {"smooth": densities.smooth(r_in, lmax, 11), "lebedev": lebedev_on(r_in, lmax),
+            "rough": densities.rough(r_in, lmax, 12)}
+    cross, kind = L.crossings(k_mov)
+    nc = cross.size
+    pairs = cross[kind == 4]
+    print(f"{name}: {r_in.size} input nodes, range ({LOW / 1e3:.3f}, {HIGH / 1e3:.3f}) km, lmax {lmax}, "
+          f"{cfg.formulation.compressible and 'TALA' or 'incompressible'}, {nc} crossings ({pairs.size} density "
+          f"pairs at {[float(x / 1e3) for x in pairs]} km)", flush=True)
+
+    def kin(x):
+        q = L(L.full_boundaries(x[None]), log_eta)
+        return L.input_kernels(sj.stokes_kernels(q, cfg)).geoid
+
+    batch = 64 if lmax <= 50 else 24
+    jv = jax.jit(jax.vmap(lambda x: jax.jvp(kin, (x,), (jnp.ones_like(x),))))
+
+    def run(points):
+        P, T = [], []
+        for c0 in range(0, points.size, batch):
+            chunk = points[c0:c0 + batch]
+            pad = np.concatenate([chunk, np.full(batch - chunk.size, chunk[-1])])
+            a, b = jv(jnp.asarray(pad))
+            P.append(np.asarray(a)[: chunk.size]); T.append(np.asarray(b)[: chunk.size])
+        return np.concatenate(P), np.concatenate(T)
+
+    grid = np.arange(LOW + M + 1.0, HIGH - M, GRID_STEP)
+    D = D_CUT
+    pts = np.concatenate([cross - 2 * D, cross - D, cross + D, cross + 2 * D, grid])
+    t0 = time.perf_counter()
+    Kp, dKp = run(pts)
+    t_jvp = time.perf_counter() - t0
+    print(f"   {pts.size} jvps in {t_jvp:.1f} s", flush=True)
+    dK_minus = 2 * dKp[nc:2 * nc] - dKp[:nc]
+    dK_plus = 2 * dKp[2 * nc:3 * nc] - dKp[3 * nc:4 * nc]
+    K_minus = 2 * Kp[nc:2 * nc] - Kp[:nc]
+    K_plus = 2 * Kp[2 * nc:3 * nc] - Kp[3 * nc:4 * nc]
+    K_grid, dK_grid = Kp[4 * nc:], dKp[4 * nc:]
+    d0 = lmax + 1 - Kp.shape[1]
+    w_in = L.input_weights
+    mask = np.zeros((2, lmax + 1, lmax + 1), dtype=bool)
+    mask[:, 2:, :] = np.tril(np.ones((lmax + 1, lmax + 1), dtype=bool))[2:]
+
+    def fields_of(Karr, d_in):
+        out = np.zeros((Karr.shape[0], 2, lmax + 1, lmax + 1))
+        out[:, :, d0:, :] = np.einsum("nlj,jclm->nclm", Karr * w_in, d_in[:, :, d0:, :])
+        return out * mask
+
+    rec = dict(table=name, lmax=lmax, n_input=int(r_in.size), n_nodes=int(L.n_nodes), low=LOW, high=HIGH,
+               r0=float(g.start), compressible=bool(cfg.formulation.compressible),
+               eta=[float(v) for v in np.exp(log_eta)], crossings=int(nc), density_pairs=[float(x) for x in pairs],
+               jvps=int(pts.size), jvp_seconds=t_jvp, anomalies={})
+    for aname, d_in in dens.items():
+        Nm, Np_ = fields_of(dK_minus, d_in), fields_of(dK_plus, d_in)
+        Vm, Vp = fields_of(K_minus, d_in), fields_of(K_plus, d_in)
+        jump = Np_ - Nm
+        vjump = Vp - Vm
+        Nmid = 0.5 * (Vp + Vm)
+        nrm = np.linalg.norm((0.5 * (Np_ + Nm)).reshape(nc, -1), axis=1)
+        rho = np.linalg.norm(jump.reshape(nc, -1), axis=1) / nrm
+        length = np.linalg.norm(vjump.reshape(nc, -1), axis=1) / nrm
+        on_pair = kind == 4
+        i_max = int(np.argmax(rho))
+        arec = dict(rho_max=float(rho[i_max]), rho_max_at_km=float(cross[i_max] / 1e3),
+                    rho_median=float(np.median(rho)),
+                    rho_at_density_pairs=[float(v) for v in rho[on_pair]],
+                    value_jump_length_m=[float(v) for v in length],
+                    value_jump_length_max_off_pairs_m=float(np.max(length[~on_pair])) if np.any(~on_pair) else 0.0,
+                    value_jump_length_at_density_pairs_m=[float(v) for v in length[on_pair]], sigma={})
+        Nt_all, dNt_all = fields_of(K_grid, d_in), fields_of(dK_grid, d_in)
+        for sr in SIG_R:
+            Er, pair_rec = [], []
+            Ev = {float(x): [] for x in pairs}
+            Lsig = {float(x): [] for x in pairs}
+            Lm = {float(x): [] for x in pairs}
+            for it, rt in enumerate(grid):
+                Nt, dNt = Nt_all[it], dNt_all[it]
+                lam = 1.0 / (sr ** 2 * np.sum(dNt ** 2))
+                win = np.abs(cross - rt) <= 1.5 * sr
+                det = np.sum(jump[win] * (Nmid[win] - Nt[None]), axis=(1, 2, 3))
+                Jr2 = lam ** 2 * (det ** 2 + np.sum(jump[win] ** 2, axis=(1, 2, 3)) / lam)
+                Er.append(np.sqrt(sr ** 2 * np.sum(Jr2)))
+                for ic in np.flatnonzero(on_pair & win):
+                    dv = vjump[ic]
+                    ev = np.sqrt(lam ** 2 * np.sum(dv * (Nmid[ic] - Nt)) ** 2 + lam * np.sum(dv ** 2))
+                    Ev[float(cross[ic])].append(ev)
+                    Lsig[float(cross[ic])].append(np.sqrt(lam) * np.linalg.norm(dv))
+                    Lm[float(cross[ic])].append(np.linalg.norm(dv) / np.linalg.norm(dNt))
+            Er = np.array(Er)
+            ib = int(np.argmax(Er))
+            for x in Ev:
+                v = np.array(Ev[x])
+                pair_rec.append(dict(radius_km=x / 1e3, n_r_true=int(v.size),
+                                     E_value_min=float(np.min(v)), E_value_median=float(np.median(v)),
+                                     E_value_max=float(np.max(v)), L_over_sigma_min=float(np.min(Lsig[x])),
+                                     L_median_m=float(np.median(Lm[x]))))
+            arec["sigma"][f"{sr / 1e3:.0f}"] = dict(E_rms_max=float(Er[ib]), E_rms_max_at_km=float(grid[ib] / 1e3),
+                                                    E_rms_median=float(np.median(Er)), E_value=pair_rec)
+            ev_txt = "; ".join(f"E_value at {p['radius_km']:.0f} km {p['E_value_min']:.3g} to {p['E_value_max']:.3g} "
+                               f"nat (L/sigma_r min {p['L_over_sigma_min']:.3g}, median L {p['L_median_m'] / 1e3:.2f} km)"
+                               for p in pair_rec)
+            print(f"   {aname} sigma_r {sr / 1e3:.0f} km: E_rms max {Er[ib]:.2e} nat at {grid[ib] / 1e3:.1f} km"
+                  + (f"; {ev_txt}" if ev_txt else ""), flush=True)
+        print(f"   {aname}: rho max {rho[i_max]:.2e} at {cross[i_max] / 1e3:.3f} km, median {np.median(rho):.2e}, "
+              f"at density pairs {[f'{v:.2e}' for v in rho[on_pair]]}; value jump as a displacement: off the pairs "
+              f"max {arec['value_jump_length_max_off_pairs_m']:.2e} m, at the pairs "
+              f"{[f'{v:.3g}' for v in length[on_pair]]} m", flush=True)
+        rec["anomalies"][aname] = arec
+    return rec
+
+
+def decision_cut(records) -> dict:
+    """Gate G6 of the c4b plan on the incompressible cut tables."""
+    rows, holds = {}, True
+    for rec in records:
+        if rec["table"] not in CUT_TABLES:
+            continue
+        for a, arec in rec["anomalies"].items():
+            ev = max([p["E_value_max"] for s in arec["sigma"].values() for p in s["E_value"]], default=0.0)
+            er = max(s["E_rms_max"] for s in arec["sigma"].values())
+            ok = arec["rho_max"] <= RHO_C1 and er <= E_RMS_CUT and ev <= E_VALUE_CUT
+            holds &= ok
+            rows[f"{rec['table']} {a}"] = dict(rho_max=arec["rho_max"], E_rms_max=er, E_value_max=ev, ok=bool(ok))
+    return dict(RHO_C1=RHO_C1, E_rms_limit=E_RMS_CUT, E_value_limit=E_VALUE_CUT, holds=bool(holds), rows=rows)
+
+
 def decision(records) -> dict:
     """The rule of plan 8.4 on T1 and T2 for the decision set (smooth, LEBEDEV)."""
     worst = {}
@@ -311,14 +512,24 @@ def main(argv=None):
         raise SystemExit(f"{path} exists; pass --overwrite to replace it")
     t0 = time.time()
     load0 = os.getloadavg()
-    records = [measure(t) for t in a.tables]
+    tables = [t for name in a.tables for t in (["T3t-1.1", "T3t-3", "T3t-10", "T3t-100"] if name == "T3t" else [name])]
+    records = [measure_cut(t) if (t in CUT_TABLES or t.startswith("T3t")) else measure(t) for t in tables]
     dec = decision(records)
-    print(f"decision (plan 8.4): E_rms <= {E_TOL} nat everywhere on T1 and T2 for smooth and LEBEDEV: {dec['holds']}")
-    for k, v in dec["E_rms_max"].items():
-        print(f"   {k}: {v:.3f}")
+    if any(r["table"] in ("T1", "T2") for r in records):
+        print(f"decision (plan 8.4): E_rms <= {E_TOL} nat everywhere on T1 and T2 for smooth and LEBEDEV: "
+              f"{dec['holds']}")
+        for k, v in dec["E_rms_max"].items():
+            print(f"   {k}: {v:.3f}")
+    dec_cut = decision_cut(records)
+    if dec_cut["rows"]:
+        print(f"c4b G6 on {', '.join(sorted({k.split()[0] for k in dec_cut['rows']}))}: rho <= {RHO_C1}, "
+              f"E_rms <= {E_RMS_CUT} nat, E_value <= {E_VALUE_CUT} nat: {dec_cut['holds']}")
+        for k, v in dec_cut["rows"].items():
+            print(f"   {k}: rho max {v['rho_max']:.2e}, E_rms max {v['E_rms_max']:.2e}, E_value max {v['E_value_max']:.2e}")
     out = dict(date=datetime.datetime.now().isoformat(timespec="seconds"), host=platform.node(),
                jax=jax.__version__, load_start=load0, load_end=os.getloadavg(), seconds=time.time() - t0,
-               group_gap_m=GROUP_GAP, grid_step_m=GRID_STEP, sigma_r_m=list(SIG_R), records=records, decision=dec)
+               group_gap_m=GROUP_GAP, grid_step_m=GRID_STEP, sigma_r_m=list(SIG_R), records=records, decision=dec,
+               decision_cut=dec_cut)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(out, indent=1))
     print(f"written {path}")

@@ -179,7 +179,8 @@ def apply(kernels: Kernels, density, profile: RadialProfile) -> Fields:
     does not move with a boundary; that field is ``Layers.fields(kernels, density)``, and
     this function refuses the profile of a movable ``Layers`` (its structure has
     ``limits``) with ``ValueError``, so that an anomaly cannot be attached to the moving
-    nodes by mistake. A ``Layers`` without a movable boundary is accepted here: this is
+    nodes by mistake. A ``Layers`` without a movable boundary, or with viscosity cuts only
+    (``motion="cut"``: no node moves), is accepted here: this is
     then the trapezoid rule of the construction table, for a density that the caller
     gives on that table (for example the output of ``Layers.sheet_mass``); a density on
     the input table goes through ``Layers.fields`` also then. ``radial_integral`` with

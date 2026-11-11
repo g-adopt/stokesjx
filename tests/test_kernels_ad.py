@@ -9,7 +9,7 @@ kernels, each divided by its constant scale ``s_o``, so that the random cotangen
 weights the four kernels equally (plan 7.6, review r2 C1).
 
 Reference of the Taylor tests: the forward values of the same functional. Reference of
-the derivative test of the slow set: a central difference of the mpmath oracle at 80
+``test_derivative_against_oracle``: a central difference of the mpmath oracle at 80
 digits, the only derivative check that does not use JAX.
 """
 
@@ -268,19 +268,16 @@ def test_t6_shift_velocity():
     assert_jvp_vjp(lambda s: case.G(s), case.x0, rtol=DOT_RTOL)
 
 
-@pytest.mark.slow
 @pytest.mark.taylor_required
 def test_t7_golden_table():
     """T7: log eta per node on the LEBEDEV table of the hager4_fsfs golden run (129
-    nodes), lmax = 50, 0.1 N(0, 1). In the slow set (5.5 s; the quick-set budget of
-    CONVENTIONS 7), as the c2 plan (risk R6) foresaw."""
+    nodes), lmax = 50, 0.1 N(0, 1) (about 5 s; listed in tests/heavy_tests.txt)."""
     t = cases.golden_table("hager4_fsfs")
     table = replace(t, core_mass=cases.PREM_CORE_MASS)
     case = _log_eta_case(table, 50)
     _smooth_case(case, 0.1 * np.random.default_rng(7).standard_normal(case.x0.shape))
 
 
-@pytest.mark.slow
 @pytest.mark.taylor_required
 def test_t8_wide5():
     """T8: log eta per node on T_wide5 (135 nodes, five decades), lmax = 100."""
@@ -288,7 +285,6 @@ def test_t8_wide5():
     _smooth_case(case, 0.1 * np.random.default_rng(8).standard_normal(case.x0.shape))
 
 
-@pytest.mark.slow
 @pytest.mark.taylor_required
 def test_t9_stiff_lid():
     """T9: log eta per node on T_stiff_lid (135 nodes, seven decades), lmax = 50, with
@@ -394,7 +390,6 @@ def test_t14_tala_no_slip():
         assert np.all(np.asarray(v) == 0), k
 
 
-@pytest.mark.slow
 @pytest.mark.taylor_required
 def test_t15_field_misfit():
     """T15: ``log eta`` and the radius together through the field misfit
@@ -406,9 +401,7 @@ def test_t15_field_misfit():
     of the amplitudes of the other cases: along the larger direction the misfit is
     strongly curved compared with its slope (uncorrected rate 1.25 on the first window
     pair, outside (0.8, 1.2); NOTES/chunks/c3-flags-fields/plan-review-r2-evidence/
-    t15_detail.out), the same cause as T2 (CONVENTIONS 8, NOTES/TOLERANCES.md). In the
-    slow set: the third move of the quick-set rule of
-    NOTES/chunks/c3-flags-fields/01-plan.md (risk R1)."""
+    t15_detail.out), the same cause as T2 (CONVENTIONS 8, NOTES/TOLERANCES.md)."""
     table = cases.t_hager(reduced=True)
     p0 = profile_from_table(table)
     cfg = sj.StokesConfig(lmax=20)
@@ -470,7 +463,6 @@ def _curved_direction(F, table, p0, k):
     raise AssertionError(f"no direction with a second-order term above {T16_CURVATURE_MIN} of its components")
 
 
-@pytest.mark.slow
 @pytest.mark.taylor_required
 @pytest.mark.parametrize("k", range(32))
 def test_t16_every_combination(k):
@@ -509,7 +501,6 @@ def test_t16_every_combination(k):
 IMBALANCE_DOT_ATOL = 1e-13
 
 
-@pytest.mark.slow
 @pytest.mark.taylor_required
 def test_t17_degree_one_imbalance():
     """T17: ``degree_one_imbalance`` (CM frame, split core, default flags) along ``log
@@ -545,7 +536,6 @@ NODE_SOLVER_TOL = 1e-13
 NODE_SOLVER_GRAD_TOL = 1e-12
 
 
-@pytest.mark.slow
 @pytest.mark.taylor_required
 def test_t18_pivot_elimination():
     """T18: ``node_solver="pivot_elimination"`` through ``stokes_kernels`` (reduced hager4,
@@ -720,7 +710,6 @@ def _oracle_shifted(table, direction, step):
     return replace(table, eta=eta)
 
 
-@pytest.mark.slow
 @pytest.mark.parametrize("name", ["hager4", "stiff_lid"])
 def test_derivative_against_oracle(name):
     """Directional derivative of the four kernels with respect to log eta at l in
