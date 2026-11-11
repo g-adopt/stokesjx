@@ -37,8 +37,15 @@ lovejx, ``real_4pi`` of SHTOOLS and of CODE-A's density files, ``real_orthonorma
 CODE-A's output) with one layout rule for every coefficient array (the degree and order
 axes last, the ``C/S`` axis before them for a real convention), their conversions, a grid
 synthesis and the Gauss-Legendre transform of lovejx. CODE-A's file formats are read and
-written by ``stokesjx.io.legacy`` (imported on use). The control map with movable
-boundaries follows in a later version.
+written by ``stokesjx.io.legacy`` (imported on use).
+
+Controls (``stokesjx.controls``): ``Layers`` maps one log viscosity per layer and the
+radii of movable viscosity boundaries to a profile (the nodes of a range follow the
+boundary affinely, ``rho0`` stays where the input profile puts it, and a density anomaly
+stays on the input table through ``Layers.fields``); ``viscosity_by_node`` maps one log
+viscosity per node; ``ControlVector`` turns a pytree of controls into one vector with a
+jitted value and gradient and a NumPy front, and ``fields.spectral_misfit`` is a weighted
+degree-power misfit. The prior and the sampler are the caller's.
 """
 
 import jax as _jax
@@ -64,7 +71,10 @@ from .formulation import (  # noqa: E402
 from .kernels import Kernels, Numerics, StokesConfig, stokes_kernels  # noqa: E402
 from . import fields, sh  # noqa: E402
 from .fields import Fields, admittance, apply, gravity_anomaly, quadrature_weights, surface_gravity  # noqa: E402
-from .profile import NodeStructure, RadialProfile, integrate_gravity  # noqa: E402
+from .profile import NodeLimits, NodeStructure, RadialProfile, integrate_gravity  # noqa: E402
+from .fields import spectral_misfit  # noqa: E402
+from . import controls  # noqa: E402
+from .controls import ControlVector, Layers, MovableRange, NodeViscosity, viscosity_by_node  # noqa: E402
 from .units import Units  # noqa: E402
 
 __version__ = "0.0.1.dev0"
@@ -74,5 +84,7 @@ __all__ = [
     "NoSlip", "Uniform",
     "Kernels", "Numerics", "StokesConfig", "stokes_kernels",
     "Fields", "admittance", "apply", "gravity_anomaly", "quadrature_weights", "surface_gravity", "fields", "sh",
-    "NodeStructure", "RadialProfile", "integrate_gravity", "Units",
+    "NodeLimits", "NodeStructure", "RadialProfile", "integrate_gravity", "Units",
+    "spectral_misfit", "controls", "ControlVector", "Layers", "MovableRange", "NodeViscosity",
+    "viscosity_by_node",
 ]

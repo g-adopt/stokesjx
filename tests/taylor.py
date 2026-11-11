@@ -128,11 +128,127 @@ def _rates(rem, eps):
     return out
 
 
+class TaylorProgram:
+    """The compiled programs of one scalar functional ``f`` for many base points and
+    directions of one pytree structure (plan c4 D9).
+
+    A plain callable passed to ``assert_taylor`` is compiled again at every call: the
+    batched forward values close over the base point and the direction, and the
+    gradient and the jvp are new ``jax.jit`` objects each time. On a solver of a few
+    hundred nodes one compile costs about 0.7 s, and a Taylor case needs three of them.
+    A ``TaylorProgram`` compiles each program once, with the base point, the direction
+    and the steps as arguments, so that every further case of the same pytree
+    structure and shapes reuses them (four cases on the reduced PREM table at
+    ``lmax = 20``: 12.0 s with separate programs, 2.84 s with one program;
+    NOTES/chunks/c4-controls-derivatives/plan-evidence/taylor_cost_proto.out).
+
+    The steps of ``values`` are padded with zeros to a fixed length (``pad_to``, by
+    default the length of the two-sign default ladder plus the base point), so a
+    one-sign measurement and a one-sided difference reuse the same compiled vmap.
+
+    Parameters
+    ----------
+    f
+        Scalar functional of a pytree of float64 arrays. It must be traceable as a
+        whole (``jit``, ``vmap``, ``grad`` and ``jvp``).
+    pad_to
+        Length to which ``values`` pads its steps.
+    """
+
+    def __init__(self, f: Callable, pad_to: int = 1 + 2 * len(DEFAULT_EPSILONS)):
+        import jax
+
+        self.f = f
+        self.pad_to = int(pad_to)
+
+        def point(x, dx, t):
+            # One point x + t dx of the line through x along dx.
+            return f(jax.tree_util.tree_map(lambda a, d: a + t * d, x, dx))
+
+        # The steps are the only batched argument; x and dx are broadcast.
+        self._values = jax.jit(jax.vmap(point, in_axes=(None, None, 0)))
+        self._grad = jax.jit(jax.grad(f))
+        self._jvp = jax.jit(lambda x, dx: jax.jvp(f, (x,), (dx,))[1])
+
+    def values(self, x, dx, steps) -> np.ndarray:
+        """``f(x + t dx)`` for every ``t`` in ``steps``, float64 numpy, one compiled call.
+
+        Steps shorter than ``pad_to`` are padded with zeros (and the padding is cut off
+        again); a longer list compiles a second program of its own length."""
+        import jax.numpy as jnp
+        steps = np.asarray(steps, dtype=np.float64)
+        n = steps.size
+        padded = np.zeros(max(n, self.pad_to))
+        padded[:n] = steps
+        return np.asarray(self._values(x, dx, jnp.asarray(padded)), dtype=np.float64)[:n]
+
+    def derivative(self, x, dx, mode: str) -> float:
+        """``<grad f(x), dx>`` from the compiled reverse mode (``jax.grad``, then a
+        float64 dot product on the host) or the compiled forward mode (``jax.jvp``)."""
+        if mode == "reverse":
+            return _vdot_tree(self._grad(x), dx)
+        if mode == "forward":
+            return float(self._jvp(x, dx))
+        raise ValueError(mode)
+
+
+class LinearTaylorProgram(TaylorProgram):
+    """A ``TaylorProgram`` of a functional that is linear in the outputs of a map,
+    ``f(x) = <c, G(x)>`` with fixed weights ``c`` (a pytree of the structure of ``G(x)``),
+    whose derivatives come from the jvp and the vjp of ``G`` (a ``DotProgram``):
+
+        forward:  <grad f, dx> = <c, J dx>          (dot.jvp)
+        reverse:  <grad f, dx> = <J^T c, dx>        (dot.vjp)
+
+    These are the forward and the reverse mode of ``f`` itself (the contraction with
+    ``c`` is linear), so the Taylor test checks the same derivatives, and the programs
+    of the dot-product test serve both: three compiles per program (the batched values,
+    the jvp, the vjp) in place of six."""
+
+    def __init__(self, f: Callable, dot: "DotProgram", weights, pad_to: int = 1 + 2 * len(DEFAULT_EPSILONS)):
+        super().__init__(f, pad_to)
+        self.dot = dot
+        self.weights = weights
+
+    def derivative(self, x, dx, mode: str) -> float:
+        if mode == "reverse":
+            return _vdot_tree(self.dot.vjp(x, self.weights), dx)
+        if mode == "forward":
+            return _vdot_tree(self.weights, self.dot.jvp(x, dx))
+        raise ValueError(mode)
+
+
+class DotProgram:
+    """The compiled programs of the jvp/vjp dot-product test of one map ``F`` (plan c4
+    D9): the value, the jvp and the vjp, each one ``jax.jit`` with the point and the
+    tangent or cotangent as arguments (``jax.jit`` compiles on the first call only).
+    ``assert_jvp_vjp`` accepts a ``DotProgram`` in place of ``F``, takes the output shapes
+    from ``jax.eval_shape`` (the value is not compiled) and compiles nothing new for a
+    further point or seed."""
+
+    def __init__(self, F: Callable):
+        import jax
+        self.F = F
+        self.value = jax.jit(F)
+        # The jvp program returns the primal output too (XLA computes it anyway), so that a
+        # caller can read the outputs at a point from the program it compiles for the
+        # tangents (for example the scales of a normalised map).
+        self.jvp_both = jax.jit(lambda x, dx: jax.jvp(F, (x,), (dx,)))
+        self.vjp = jax.jit(lambda x, dy: jax.vjp(F, x)[1](dy)[0])
+
+    def jvp(self, x, dx):
+        """``J dx`` (the tangent of the compiled ``jvp_both``)."""
+        return self.jvp_both(x, dx)[1]
+
+
 def directional_derivative(f, x, dx, mode: str, jit: bool = True) -> float:
     """``<grad f(x), dx>`` from reverse mode (``jax.grad``) or forward mode
     (``jax.jvp``), compiled with ``jax.jit`` unless ``jit=False`` (for a function
-    that cannot be traced as a whole)."""
+    that cannot be traced as a whole). ``f`` can be a ``TaylorProgram``, whose compiled
+    programs are reused."""
     import jax
+    if isinstance(f, TaylorProgram):
+        return f.derivative(x, dx, mode)
     if mode == "reverse":
         g = jax.grad(f)
         return _vdot_tree((jax.jit(g) if jit else g)(x), dx)
@@ -156,9 +272,13 @@ def _values_along(f, x, dx, steps, batched: bool) -> np.ndarray:
     """``f(x + t dx)`` for every ``t`` in ``steps``, as float64 numpy.
 
     With ``batched=True`` all points are one ``jax.jit(jax.vmap(...))`` call (one
-    compile, one launch); otherwise ``f`` is called once per point, eagerly."""
+    compile, one launch); otherwise ``f`` is called once per point, eagerly. A
+    ``TaylorProgram`` uses its own compiled vmap (``batched`` is then ignored)."""
     import jax
     import jax.numpy as jnp
+
+    if isinstance(f, TaylorProgram):
+        return f.values(x, dx, steps)
 
     def point(t):
         return f(jax.tree_util.tree_map(lambda a, d: a + t * d, x, dx))
@@ -200,7 +320,8 @@ def taylor_remainders(f: Callable, x, dx, *, sign: float = 1.0,
     Parameters
     ----------
     f
-        Scalar functional of a pytree of float64 arrays.
+        Scalar functional of a pytree of float64 arrays, or a ``TaylorProgram`` (its
+        compiled programs are reused).
     derivative
         Directional derivative along ``+dx`` to test. Default: from ``mode``. A
         negative control passes a biased value here.
@@ -302,7 +423,8 @@ def assert_taylor(f: Callable, x, dx, *, epsilons=DEFAULT_EPSILONS, window=(0, 1
     """Run the Taylor test for every sign and mode and assert a pass for each.
 
     ``f`` is evaluated once at ``x`` and at every rung of every sign, in one jitted
-    ``vmap`` call; each mode computes its derivative once (jitted) and all
+    ``vmap`` call (``f`` can be a ``TaylorProgram``, whose compiled programs are
+    reused for every base point and direction of the same structure); each mode computes its derivative once (jitted) and all
     (mode, sign) measurements share the forward values. Raises ``AssertionError``
     with the full ladder table on a fail or an unresolved measurement.
     ``derivative`` replaces the derivative of every mode (negative controls; for a
@@ -343,25 +465,38 @@ def assert_jvp_vjp(F: Callable, x, *, dx=None, dy=None, seed: int = 0, rtol: flo
     custom reverse rule (a ``custom_vjp``, which has no forward mode) against the
     forward mode of the plain implementation. Random ``dx`` and ``dy`` come from a
     fixed seed. The value, the jvp and the vjp are each compiled with ``jax.jit``
-    unless ``jit=False``. Returns the relative difference
+    unless ``jit=False``; a ``DotProgram`` in place of ``F`` brings its own compiled
+    programs, so a second point or seed compiles nothing. Returns the relative difference
     ``|a - b| / max(|a|, |b|)`` and raises ``AssertionError`` above ``rtol``.
     """
     import jax
     _check_float64(x, "point")
-    forward = forward or F
+    if isinstance(F, DotProgram):
+        # The compiled programs of the map: no new compile for a further point or seed.
+        # The output is needed only for its shapes (the random cotangent), which
+        # jax.eval_shape gives without compiling the value.
+        if forward is not None:
+            raise ValueError("a DotProgram carries its own forward map; pass forward=None")
+        jvp_fn, vjp_fn = F.jvp, F.vjp
 
-    def jvp(x, dx):
-        return jax.jvp(forward, (x,), (dx,))[1]
+        def value_fn(x):
+            return jax.tree_util.tree_map(lambda s: np.zeros(s.shape, s.dtype), jax.eval_shape(F.F, x))
+    else:
+        forward = forward or F
 
-    def vjp(x, dy):
-        return jax.vjp(F, x)[1](dy)[0]
-    wrap = jax.jit if jit else (lambda g: g)
-    y = wrap(F)(x)
+        def jvp(x, dx):
+            return jax.jvp(forward, (x,), (dx,))[1]
+
+        def vjp(x, dy):
+            return jax.vjp(F, x)[1](dy)[0]
+        wrap = jax.jit if jit else (lambda g: g)
+        value_fn, jvp_fn, vjp_fn = wrap(F), wrap(jvp), wrap(vjp)
+    y = value_fn(x)
     _check_float64(y, "output")
     dx = random_like(x, seed) if dx is None else dx
     dy = random_like(y, seed + 1) if dy is None else dy
-    jdx = wrap(jvp)(x, dx)
-    jtdy = wrap(vjp)(x, dy)
+    jdx = jvp_fn(x, dx)
+    jtdy = vjp_fn(x, dy)
     a = _vdot_tree(dy, jdx)
     b = _vdot_tree(jtdy, dx)
     rel = abs(a - b) / max(abs(a), abs(b))

@@ -169,7 +169,22 @@ def apply(kernels: Kernels, density, profile: RadialProfile) -> Fields:
 
     ``radial_integral(kernels, density, quadrature_weights(profile))``; see there for
     the layouts. ``profile`` is the profile of the kernels: its radius sets the weights,
-    so a derivative with respect to a movable radius reaches the weights too.
+    so a derivative with respect to a radius reaches the weights too. When both radii
+    are concrete, ``kernels.radius`` must equal ``profile.radius`` (``ValueError``): a
+    profile with the same node count and other radii would give wrong weights.
+
+    The density rule (NOTES/chunks/c4-controls-derivatives/01-plan.md D11). The density
+    is given on the node table of ``profile``. For a ``controls.Layers`` with movable
+    boundaries the density of a field is given on the INPUT table of the ``Layers`` and
+    does not move with a boundary; that field is ``Layers.fields(kernels, density)``, and
+    this function refuses the profile of a movable ``Layers`` (its structure has
+    ``limits``) with ``ValueError``, so that an anomaly cannot be attached to the moving
+    nodes by mistake. A ``Layers`` without a movable boundary is accepted here: this is
+    then the trapezoid rule of the construction table, for a density that the caller
+    gives on that table (for example the output of ``Layers.sheet_mass``); a density on
+    the input table goes through ``Layers.fields`` also then. ``radial_integral`` with
+    explicit weights does not check: a caller who passes weights takes the
+    responsibility.
 
     Example::
 
@@ -183,7 +198,53 @@ def apply(kernels: Kernels, density, profile: RadialProfile) -> Fields:
     its gradient; as an argument the field map adds 0.01 to 0.03 s
     (NOTES/chunks/c3-flags-fields/impl-evidence/density_constant.out).
     """
+    if profile.structure.limits is not None:
+        raise ValueError("the density of a movable Layers profile is given on the input table and does not "
+                         "move with a boundary; use Layers.fields(kernels, density)")
+    k_r, p_r = kernels.radius, profile.radius
+    if not isinstance(k_r, jax.core.Tracer) and not isinstance(p_r, jax.core.Tracer):
+        if np.shape(k_r) != np.shape(p_r) or not np.array_equal(np.asarray(k_r), np.asarray(p_r)):
+            raise ValueError("the kernels were computed on other radii than the profile's: kernels.radius "
+                             "differs from profile.radius, so the trapezoid weights would not belong to the "
+                             "kernels; pass the profile of the kernels")
     return radial_integral(kernels, density, quadrature_weights(profile))
+
+
+def spectral_misfit(field, observed, weights, convention: str) -> jax.Array:
+    """A weighted spectral misfit of a field, ``sum_batch sum_l w_l S_dd(l)`` with
+    ``d = field - observed`` (NOTES/chunks/c4-controls-derivatives/01-plan.md D8).
+
+    ``S_dd(l)`` is the degree power of ``sh.degree_power(d, d, convention)``: in
+    ``real_4pi`` (and equally ``complex_4pi``) ``sum_m (C_lm^2 + S_lm^2)`` of the
+    difference, the mean square over the sphere per degree; ``real_orthonormal`` gives
+    ``4 pi`` times it. For data with independent errors of standard deviation
+    ``sigma_l`` per coefficient, ``weights = 1 / (2 sigma_l^2)`` makes the misfit the
+    negative Gaussian log-likelihood up to a constant; zeros leave degrees out (for
+    example ``l < 2``). The sign and the prior are the caller's (ruling of 2026-11-10:
+    the package does not choose a sampler).
+
+    Parameters
+    ----------
+    field, observed
+        Coefficient arrays of one shape under the layout rule of ``convention``
+        (CONVENTIONS 15), batch axes allowed (summed).
+    weights
+        ``(L + 1,)`` float64, one weight per degree of the arrays; another length
+        raises ``ValueError``.
+    convention
+        ``"real_4pi"``, ``"complex_4pi"`` or ``"real_orthonormal"``.
+
+    Returns
+    -------
+    A scalar. No square root is taken, so the derivative is finite at ``d = 0``: with
+    respect to ``field`` it is ``2 w_l d`` in ``real_4pi``.
+    """
+    d = jnp.asarray(field) - jnp.asarray(observed)
+    S = sh.degree_power(d, d, convention)                                 # (..., L+1)
+    w = jnp.asarray(weights, dtype=jnp.float64)
+    if w.shape != (S.shape[-1],):
+        raise ValueError(f"weights must hold one weight per degree, shape ({S.shape[-1]},), got {w.shape}")
+    return jnp.sum(S * w)
 
 
 def surface_gravity(profile: RadialProfile, config: StokesConfig) -> jax.Array:
@@ -202,8 +263,9 @@ def gravity_anomaly(geoid, g_surface, radius, degrees=None) -> jax.Array:
 
     (1 mGal = 1e-5 m/s^2). Because the same ``g(R)`` divides the potential in eq. 9.1,
     ``Delta g_l = f_l phi_l / R`` for every background. At ``l = 1`` the factor is zero:
-    the degree-1 geoid of the centre-of-mass frame is a translation of the frame and
-    has no free-air anomaly. At ``l = 0`` the factor is set to zero: the package has no
+    in the centre-of-mass frame the degree-1 geoid is zero, and a degree-1 geoid term
+    (raw frame) is the sign of an origin away from the centre of mass, for which the
+    factor ``l - 1 = 0`` gives no free-air anomaly. At ``l = 0`` the factor is set to zero: the package has no
     degree-0 response (a density anomaly of degree 0 changes the mass of the Earth), and
     a degree-0 entry from elsewhere (a mean geoid height, a reference offset) is not a
     mass anomaly of the model; ``(l - 1) = -1`` would turn it into a gravity value with
@@ -231,8 +293,9 @@ def gravity_anomaly(geoid, g_surface, radius, degrees=None) -> jax.Array:
     """
     geoid = jnp.asarray(geoid)
     if degrees is None:
-        if geoid.ndim < 2:
-            raise ValueError(f"a coefficient array has the degree and order axes last; got the shape {geoid.shape}")
+        if geoid.ndim < 2 or geoid.shape[-1] != geoid.shape[-2]:
+            raise ValueError(f"a coefficient array has the degree and order axes last, of equal length L + 1; got "
+                             f"the shape {geoid.shape} (a kernel array (L, N) needs degrees=Kernels.degrees)")
         l = np.arange(geoid.shape[-2], dtype=np.float64)
         f = np.where(l >= 1, l - 1.0, 0.0)[:, None]                      # (L+1, 1): over the order axis
     else:

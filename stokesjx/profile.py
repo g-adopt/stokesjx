@@ -10,13 +10,14 @@ The module holds two objects:
 
 ``NodeStructure``
     The static part: the construction radii, the positions of the pairs and the core
-    model (consistent or split). It is frozen and hashable, it is read on the host,
-    and it is part of the static key of every jitted solve. The Pade plan of the
-    interval exponentials (``linalg.pade_plan``) is computed from its widths.
+    model (consistent or split), and for a table with movable boundaries the static
+    limits of the moved nodes (``NodeLimits``). It is frozen and hashable, it is read
+    on the host, and it is part of the static key of every jitted solve. The Pade plan
+    of the interval exponentials (``linalg.pade_plan``) is computed from its widths.
 ``RadialProfile``
-    A JAX pytree of the seven arrays that a derivative can move (radius, ``rho0``,
-    ``eta``, core density, core mass, water density, topography density), with the
-    ``NodeStructure`` as static auxiliary data.
+    A JAX pytree of the eight arrays that a derivative can move (radius, ``rho0``,
+    ``eta``, core density, core mass, water density, topography density, uniform
+    gravity), with the ``NodeStructure`` as static auxiliary data.
 
 The profile carries no gravity array. Gravity is a function of the background flag
 of the formulation, of ``rho0``, of the radius and of the core mass, and the solver
@@ -46,6 +47,43 @@ def _is_traced(x) -> bool:
 
 
 @dataclass(frozen=True)
+class NodeLimits:
+    """Static upper limits of a node table whose radii and ``rho0`` move under a trace
+    (a ``controls.Layers`` with movable boundaries; CONVENTIONS 2). Frozen, hashable.
+
+    The Pade order and squaring count of the interval exponentials are static, and
+    under a trace no value check can run. A movable boundary widens the intervals on
+    one side of its pair and changes ``rho0`` at the moved nodes, so the plan must be
+    built from the largest values that any admissible position of the boundaries
+    gives. ``Layers`` computes them on the host when it is built, from the clamp bounds
+    and the crossing positions of every range (NOTES/chunks/c4-controls-derivatives/01-plan.md D3).
+
+    Attributes
+    ----------
+    width
+        ``(N - 1,)`` upper limit of each interval width in ``ln r`` over every
+        admissible position (0 at a pair). ``NodeStructure.width_bounds`` returns the
+        elementwise maximum of the construction widths and these.
+    kappa_h
+        ``(N - 1,)`` upper limit of ``|ln(rho0_i / rho0_(i-1))|`` per interval over every
+        admissible position, 0 at a pair (whose TALA step is the closed form of eq.
+        12.3). ``propagate.static_plan`` refuses a structure whose limit exceeds
+        ``Numerics.kappa_h_max`` on an ordinary interval under TALA.
+    rho0_max
+        Largest ``rho0`` in kg/m^3 that any admissible position gives. ``static_plan``
+        refuses it above ``Numerics.rho0_max`` under FULL self-gravitation.
+
+    The limits cover the motion of the nodes only. A traced ``rho0`` control (the
+    ``rho0`` keyword of ``Layers``) can leave them, as every traced leaf can leave
+    the static limits of ``Numerics``; the caller's prior must keep it inside.
+    """
+
+    width: tuple[float, ...]
+    kappa_h: tuple[float, ...]
+    rho0_max: float
+
+
+@dataclass(frozen=True)
 class NodeStructure:
     """Static, hashable node structure of a profile, read on the host.
 
@@ -63,11 +101,19 @@ class NodeStructure:
         True when the core mass is the consistent value ``(4 pi / 3) r_c^3 rho_c``
         (``RadialProfile.core_mass is None``). It is a static switch of the degree-1
         frame rule (equations.md 10(f)), so it belongs to the structure.
+    limits
+        ``None`` (a fixed node table: every structure built by ``from_radius``), or the
+        ``NodeLimits`` of a table whose nodes move with a boundary (set by
+        ``controls.Layers`` only). The last field, with the default ``None``: two
+        structures without limits compare and hash equal when their other fields are
+        equal, so the jit key and the Pade plan of a fixed node table do not depend on
+        this field.
     """
 
     radius: tuple[float, ...]
     pairs: tuple[int, ...]
     consistent_core: bool
+    limits: NodeLimits | None = None
 
     @property
     def n_nodes(self) -> int:
@@ -91,10 +137,13 @@ class NodeStructure:
         the error floor of the steps at high degree
         (NOTES/chunks/c1-foundations/04-review-physics-r3.md, minor 3). A movable
         boundary widens these limits to the largest width that its range allows
-        (CONVENTIONS 2)."""
+        (CONVENTIONS 2): with ``limits`` set, the result is the elementwise maximum of
+        the construction widths and ``limits.width``."""
         r = np.asarray(self.radius, dtype=np.float64)
         h = np.log1p((r[1:] - r[:-1]) / r[:-1])
         h[list(np.asarray(self.pairs, dtype=int) - 1)] = 0.0
+        if self.limits is not None:
+            h = np.maximum(h, np.asarray(self.limits.width, dtype=np.float64))
         return h
 
     @property
@@ -247,6 +296,13 @@ class RadialProfile:
         Physical reason for the field (CONVENTIONS 14): PREM has 1020 or 2600 kg/m^3
         at the top node depending on its ocean layer, and CODE-A uses
         ``bgrho = 4500 kg/m^3`` (F3).
+    uniform_gravity
+        Scalar, m/s^2, or ``None`` (default). The value of a uniform background gravity
+        as a traced leaf, so that ``g0`` can be a control (NOTES/chunks/c4-controls-derivatives/01-plan.md
+        D5). It is read only under ``Uniform(None)`` (``formulation.Uniform``), and the
+        two go together: ``propagate.check_profile`` refuses ``Uniform(None)`` without
+        this leaf and this leaf with any other background. ``None`` is an empty subtree,
+        so a profile without the leaf keeps its leaves.
     structure
         Static ``NodeStructure``. Without it, the radius must be concrete and the
         structure is built from it; with it, the radius can be traced (for a control
@@ -264,18 +320,20 @@ class RadialProfile:
     """
 
     __slots__ = ("radius", "rho0", "eta", "core_density", "core_mass", "outer_density",
-                 "surface_density", "structure")
+                 "surface_density", "uniform_gravity", "structure")
 
     def __init__(self, radius, rho0, eta, *, core_density, core_mass=None, outer_density=0.0,
-                 surface_density=None, structure: NodeStructure | None = None):
+                 surface_density=None, uniform_gravity=None, structure: NodeStructure | None = None):
         radius, rho0, eta = _as_f64(radius), _as_f64(rho0), _as_f64(eta)
         core_density, core_mass = _as_f64(core_density), _as_f64(core_mass)
         outer_density, surface_density = _as_f64(outer_density), _as_f64(surface_density)
+        uniform_gravity = _as_f64(uniform_gravity)
         if radius.ndim != 1 or rho0.shape != radius.shape or eta.shape != radius.shape:
             raise ValueError(f"radius, rho0 and eta must be one-dimensional arrays of one shape; "
                              f"got {radius.shape}, {rho0.shape}, {eta.shape}")
         for name, v in (("core_density", core_density), ("core_mass", core_mass),
-                        ("outer_density", outer_density), ("surface_density", surface_density)):
+                        ("outer_density", outer_density), ("surface_density", surface_density),
+                        ("uniform_gravity", uniform_gravity)):
             if v is not None and v.shape != ():
                 raise ValueError(f"{name} must be a scalar, got shape {v.shape}")
         if structure is None:
@@ -289,7 +347,8 @@ class RadialProfile:
                 raise ValueError("core_mass is None exactly when the structure has a consistent core")
         for name, v in (("radius", radius), ("rho0", rho0), ("eta", eta), ("core_density", core_density),
                         ("core_mass", core_mass), ("outer_density", outer_density),
-                        ("surface_density", surface_density), ("structure", structure)):
+                        ("surface_density", surface_density), ("uniform_gravity", uniform_gravity),
+                        ("structure", structure)):
             object.__setattr__(self, name, v)
 
     def __setattr__(self, name, value):
@@ -300,8 +359,7 @@ class RadialProfile:
         ``p.replace(eta=jnp.exp(log_eta))``. The new leaves can be traced. A change of
         ``core_mass`` between ``None`` and a number changes the core model, which the
         structure fixes, and raises ``ValueError``."""
-        kw = {k: getattr(self, k) for k in ("radius", "rho0", "eta", "core_density", "core_mass",
-                                             "outer_density", "surface_density")}
+        kw = {k: getattr(self, k) for k in _LEAF_NAMES}
         unknown = set(arrays) - set(kw)
         if unknown:
             raise TypeError(f"unknown profile fields: {sorted(unknown)}")
@@ -331,10 +389,16 @@ class RadialProfile:
                 f"consistent_core={self.structure.consistent_core})")
 
 
+#: The leaves of a profile, in pytree order. ``uniform_gravity`` is the eighth child:
+#: ``None`` is an empty subtree, so a profile without it has seven array leaves, and
+#: every profile of a process has the same tree definition.
+_LEAF_NAMES = ("radius", "rho0", "eta", "core_density", "core_mass", "outer_density", "surface_density",
+               "uniform_gravity")
+
+
 def _flatten(p: RadialProfile):
-    """Seven children (``None`` children are empty subtrees) and the static structure."""
-    return ((p.radius, p.rho0, p.eta, p.core_density, p.core_mass, p.outer_density, p.surface_density),
-            p.structure)
+    """Eight children (``None`` children are empty subtrees) and the static structure."""
+    return tuple(getattr(p, k) for k in _LEAF_NAMES), p.structure
 
 
 def _unflatten(structure: NodeStructure, children) -> RadialProfile:
@@ -342,8 +406,7 @@ def _unflatten(structure: NodeStructure, children) -> RadialProfile:
     placeholders (``object()`` in some transformations), and a validation would read a
     tracer or fail on a placeholder."""
     p = object.__new__(RadialProfile)
-    names = ("radius", "rho0", "eta", "core_density", "core_mass", "outer_density", "surface_density")
-    for name, v in zip(names, children):
+    for name, v in zip(_LEAF_NAMES, children):
         object.__setattr__(p, name, v)
     object.__setattr__(p, "structure", structure)
     return p

@@ -32,3 +32,21 @@ tests/test_flags.py::test_steps_flags_against_oracle
 tests/test_flags.py::test_vmap_flags
 tests/test_flags.py::test_flag_invariants
 tests/test_sh.py::test_synthesis_grid_against_evaluate
+# Chunk 4 (c4-controls-derivatives): quick tests above about 2 s under `-n 8` (measured on
+# reunion, 2026-11-11, load average 8 to 9 at the start with four processes of another job),
+# and the c1 and c2 tests above 2 s that the list did not hold (c3 JAX review, minor 9).
+tests/test_controls_ad.py::test_p1
+tests/test_controls_ad.py::test_p2
+tests/test_controls_ad.py::test_p3
+tests/test_controls_ad.py::test_g15q_3
+tests/test_controls_ad.py::test_g16q_3
+tests/test_primitives_ad.py::test_interval_step_through_exponent
+tests/test_primitives_ad.py::test_pade_pair_through_elimination
+tests/test_primitives_ad.py::test_solve_elimination_value_and_derivative
+tests/test_primitives_values.py::test_step_equals_oracle_interval_step
+tests/test_reference_oracle.py::test_stored_equals_live_quick
+tests/test_controls_ad.py::test_i7_i8_vmap_and_one_trace
+tests/test_controls_ad.py::test_g15q_1
+tests/test_controls_ad.py::test_g16q_1
+# Chunk 4, round 1 of the implementation review: the G4 case on a wide range (5.1 s).
+tests/test_controls_ad.py::test_g4_wide_range

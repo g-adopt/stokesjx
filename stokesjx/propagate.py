@@ -158,11 +158,16 @@ def static_plan(structure: NodeStructure, config: StokesConfig,
        density limit ``Numerics.rho0_max / rho_s`` (0 under NO_SELF_GRAVITY) and, under
        TALA, the limit ``Numerics.kappa_h_max`` of ``|kappa_h|`` on every ordinary
        interval (zero at a pair, whose step is the closed form of eq. 12.3;
-       CONVENTIONS 2).
+       CONVENTIONS 2). With ``structure.limits`` (a table with movable boundaries) the
+       widths are the widened limits (``NodeStructure.width_bounds``).
 
-    Raises ``ValueError`` for a frame that the static rule does not offer, and for
+    Raises ``ValueError`` for a frame that the static rule does not offer, for
     CODE-A's one-sided TALA rule on a structure with jump pairs (it divides by the
-    radial gap of an interval).
+    radial gap of an interval), and for ``structure.limits`` beyond the static limits
+    of ``Numerics``: ``limits.rho0_max > rho0_max`` under FULL, or ``limits.kappa_h >
+    kappa_h_max`` on an ordinary interval under TALA. These two checks replace, for the
+    moved nodes, the value checks that ``check_profile`` cannot run on a traced radius
+    and ``rho0``.
     """
     form = config.formulation
     request = config.degree_one
@@ -186,6 +191,25 @@ def static_plan(structure: NodeStructure, config: StokesConfig,
     if term_record.anelastic and discretisation.kappa_rule == "legacy_one_sided" and structure.pairs:
         raise ValueError("the one-sided kappa rule of CODE-A divides by the radial gap of an interval and is "
                          f"undefined at the jump pairs {structure.pairs}; use kappa_rule='log_slope'")
+    limits = structure.limits
+    if limits is not None:
+        # A table whose nodes move under a trace (controls.Layers): the value checks of
+        # check_profile cannot run on a traced radius or rho0, so the static limits of
+        # every admissible position replace them here, at every call (the plan is
+        # cached, the exception is not).
+        if term_record.self_gravity and limits.rho0_max > config.numerics.rho0_max:
+            raise ValueError(f"the movable boundaries of this table give rho0 up to {limits.rho0_max} kg/m^3, "
+                             f"above Numerics.rho0_max = {config.numerics.rho0_max} kg/m^3, the limit of the "
+                             "static Pade plan; raise Numerics.rho0_max")
+        if term_record.anelastic:
+            k_lim = np.asarray(limits.kappa_h, dtype=np.float64) * structure.interval_mask
+            if k_lim.size and np.max(k_lim) > config.numerics.kappa_h_max:
+                i = int(np.argmax(k_lim))
+                raise ValueError(f"|kappa_h| = |ln(rho0_i / rho0_(i-1))| on the interval {i + 1} (nodes {i} and "
+                                 f"{i + 1}) reaches {np.max(k_lim):.4f} at an admissible position of a movable "
+                                 f"boundary, above Numerics.kappa_h_max = {config.numerics.kappa_h_max}, the "
+                                 "static limit of the Pade plan under TALA; narrow the movable range that "
+                                 "holds this interval, or raise Numerics.kappa_h_max")
     bound = linalg.balanced_norm_bound_intervals(degrees[-1], structure.width_bounds,
                                                  kappa_h_max * structure.interval_mask, rho_max)
     return StaticPlan(degrees=degrees, frame=frame_at_one,
@@ -197,7 +221,8 @@ def static_plan(structure: NodeStructure, config: StokesConfig,
 
 
 def reference_viscosity(eta, rule) -> jax.Array:
-    """The viscosity scale ``eta_ref`` of the state vector, Pa s (D1).
+    """The viscosity scale ``eta_ref`` of the state vector, Pa s
+    (NOTES/chunks/c2-forward-core/01-plan.md, D1).
 
     ``rule``: ``"largest"`` (the solver's rule, ``stop_gradient(max eta)``),
     ``"geometric_mean"`` (``stop_gradient(exp(mean(log eta)))``, for the measurement
@@ -217,11 +242,18 @@ def reference_viscosity(eta, rule) -> jax.Array:
 def background_gravity(profile: RadialProfile, formulation: Formulation, units: Units) -> jax.Array:
     """Background gravity at the nodes, m/s^2, ``(N,)``: hydrostatic from ``rho0`` and the
     core mass (eq. 6.1) or uniform (eq. 6.2). Evaluated inside the differentiated
-    function, so it follows ``rho0``, the radius and the core under ``jax.grad``."""
+    function, so it follows ``rho0``, the radius and the core under ``jax.grad``. The
+    uniform value is the static ``Uniform.value``, or for ``Uniform(None)`` the profile
+    leaf ``uniform_gravity``, which can be traced (a control ``g0``)."""
     if isinstance(formulation.background, Hydrostatic):
         return profile.hydrostatic_gravity(units)
     if isinstance(formulation.background, Uniform):
-        return jnp.full(profile.radius.shape, formulation.background.value, dtype=jnp.float64)
+        # A number in the flag is static; Uniform(None) reads the traced profile leaf
+        # (check_profile has checked on the host that exactly one of the two is set).
+        value = formulation.background.value
+        if value is None:
+            value = profile.uniform_gravity
+        return jnp.full(profile.radius.shape, value, dtype=jnp.float64)
     raise TypeError(formulation.background)
 
 
@@ -431,7 +463,8 @@ def _concrete_leaves(profile: RadialProfile) -> dict:
     the interval widths still run.
     """
     out = {}
-    for k in ("radius", "rho0", "eta", "core_density", "core_mass", "outer_density", "surface_density"):
+    for k in ("radius", "rho0", "eta", "core_density", "core_mass", "outer_density", "surface_density",
+              "uniform_gravity"):
         v = getattr(profile, k)
         if v is not None and not isinstance(v, jax.core.Tracer):
             out[k] = np.asarray(v)
@@ -449,14 +482,29 @@ def check_profile(profile: RadialProfile, plan: StaticPlan, config: StokesConfig
     have the structure, ``|kappa_h|`` on an ordinary interval exceeds
     ``Numerics.kappa_h_max`` under TALA, or the widths (and under TALA the actual
     ``kappa_h``) make the static Pade plan invalid (scaled norm above the accuracy
-    threshold or a denominator that is not diagonally dominant).
+    threshold or a denominator that is not diagonally dominant). The leaf
+    ``uniform_gravity`` must be set exactly under ``Uniform(None)`` (a static check of
+    the pytree structure, which also runs under a trace), and a concrete value of it
+    must be finite and positive.
 
     Each check runs when the leaves that it reads are concrete (``_concrete_leaves``).
     """
+    # The uniform-gravity leaf and the flag go together. The test reads only whether
+    # the leaf is None, which is pytree structure and so static: it runs under a trace.
+    background = config.formulation.background
+    wants_leaf = isinstance(background, Uniform) and background.value is None
+    if wants_leaf and profile.uniform_gravity is None:
+        raise ValueError("Uniform(None) reads the uniform gravity from the profile leaf uniform_gravity, "
+                         "which is None; set it with profile.replace(uniform_gravity=g0)")
+    if not wants_leaf and profile.uniform_gravity is not None:
+        raise ValueError(f"the profile carries uniform_gravity, which only the background Uniform(None) "
+                         f"reads; the formulation has {background!r}")
     leaves = _concrete_leaves(profile)
     for k, v in leaves.items():
         if not np.all(np.isfinite(v)):
             raise ValueError(f"{k} has a value that is not finite")
+    if "uniform_gravity" in leaves and not leaves["uniform_gravity"] > 0:
+        raise ValueError(f"a uniform background gravity must be positive, got {leaves['uniform_gravity']}")
     if "eta" in leaves and np.any(leaves["eta"] <= 0):
         raise ValueError("every viscosity must be positive")
     rho0 = leaves.get("rho0")

@@ -63,13 +63,27 @@ class Uniform:
     Attributes
     ----------
     value
-        ``g0`` in m/s^2, positive. CODE-A uses 10 (``grav()``, matrix.f:98); the
-        G-ADOPT benchmark and ``assess`` use their own value.
+        ``g0`` in m/s^2, positive, or ``None`` (default). CODE-A uses 10 (``grav()``,
+        matrix.f:98); the G-ADOPT benchmark and ``assess`` use their own value. A number
+        is static: it is a field of the hashable config, and a new number compiles
+        again. ``None`` means that the value is the profile leaf
+        ``RadialProfile.uniform_gravity``, which can be traced, so that ``g0`` can be a
+        control of a derivative (CONVENTIONS 2: a traced parameter of a flag never lives
+        in the config; NOTES/chunks/c4-controls-derivatives/01-plan.md D5).
+        ``propagate.check_profile`` refuses ``Uniform(None)`` without the leaf and the
+        leaf with a number here or with ``Hydrostatic()``.
+
+    The interval steps do not depend on ``g`` (F1), so the value does not change the
+    Pade plan. Under ``NO_SELF_GRAVITY`` the kernels are exact powers of ``g0``: the
+    geoid kernel is proportional to ``1 / g0``, the velocity kernel to ``g0``, and both
+    topographies do not depend on it. Under ``FULL`` the dependence is not a power.
     """
 
-    value: float
+    value: float | None = None
 
     def __post_init__(self):
+        if self.value is None:
+            return
         if not self.value > 0:
             raise ValueError(f"a uniform background gravity must be positive, got {self.value!r}")
         object.__setattr__(self, "value", float(self.value))

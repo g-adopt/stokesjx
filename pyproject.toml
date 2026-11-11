@@ -40,16 +40,20 @@ include = ["stokesjx*"]
 
 [tool.pytest.ini_options]
 # The default run is the quick set: every test without the `slow` marker. It is
-# the gate that every chunk runs, and it must stay under 60 s wall time with
-# `-n 8` on reunion. The slow set runs only when asked for with `-m slow`, or
+# the gate that every chunk runs, and it must finish in at most 300 s wall time
+# with `-n 8` on reunion (NOTES/PLAN.md ruling 12). The slow set runs only when asked for with `-m slow`, or
 # with `-m ""` for both sets. A later `-m` on the command line replaces this one.
 # Inside the quick set, the functions listed in tests/heavy_tests.txt carry the
 # `heavy` marker (tests/conftest.py adds it). The fast tier is
 # `-m "not slow and not heavy"`.
-# `--dist loadgroup`: under pytest-xdist (`-n 8`) the tests that carry one
-# `xdist_group` mark run on one worker, so that a solve that they share compiles once
-# (tests/test_kernels_oracle.py). Without `-n` the option has no effect.
-addopts = "-m 'not slow' --dist loadgroup"
+# `--dist worksteal`: under pytest-xdist (`-n 8`) an idle worker takes tests from the
+# queue of a busy one, so a few long tests at the end of a queue do not leave the other
+# workers idle (measured 53 to 54 s against 59 to 64 s with `load` for the quick set,
+# NOTES/chunks/c4-controls-derivatives/03-implementation.md). The `xdist_group` marks of
+# the tests are kept but have no effect: pytest-xdist 3.8 under pytest 9 does not honour
+# them (`--dist loadgroup` distributes as `load` does), so tests that must share a compiled
+# program run in one test function. Without `-n` the option has no effect.
+addopts = "-m 'not slow' --dist worksteal"
 # Ceiling on one test. `timeout_func_only` keeps fixture setup outside the
 # budget, because the first JAX compile can be slow on its own.
 timeout = 1800
