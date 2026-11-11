@@ -10,9 +10,10 @@ The module holds two objects:
 
 ``NodeStructure``
     The static part: the construction radii, the positions of the pairs and the core
-    model (consistent or split), for a table with movable boundaries the static
-    limits of the moved nodes (``NodeLimits``), and for a table with viscosity cuts the
-    node ranges of the cuts (``cuts``). It is frozen and hashable, it is read
+    model (consistent or split), for a table with movable boundaries under
+    ``motion="affine"`` the static limits of the moved nodes (``NodeLimits``), and for a
+    table with viscosity cuts (``motion="cut"``, the default) the node ranges of the cuts
+    (``cuts``). It is frozen and hashable, it is read
     on the host, and it is part of the static key of every jitted solve. The Pade plan
     of the interval exponentials (``linalg.pade_plan``) is computed from its widths.
 ``RadialProfile``
@@ -51,7 +52,8 @@ def _is_traced(x) -> bool:
 @dataclass(frozen=True)
 class NodeLimits:
     """Static upper limits of a node table whose radii and ``rho0`` move under a trace
-    (a ``controls.Layers`` with movable boundaries; CONVENTIONS 2). Frozen, hashable.
+    (a ``controls.Layers`` with movable boundaries under ``motion="affine"``; CONVENTIONS
+    2). Frozen, hashable.
 
     The Pade order and squaring count of the interval exponentials are static, and
     under a trace no value check can run. A movable boundary widens the intervals on
@@ -196,7 +198,7 @@ class NodeStructure:
         width a relative error of ``2.2e-16 / h`` (2.4e-14 on 129 nodes), which sets
         the error floor of the steps at high degree
         (NOTES/chunks/c1-foundations/04-review-physics-r3.md, minor 3). A movable
-        boundary widens these limits to the largest width that its range allows
+        boundary under ``motion="affine"`` widens these limits to the largest width that its range allows
         (CONVENTIONS 2): with ``limits`` set, the result is the elementwise maximum of
         the construction widths and ``limits.width``."""
         r = np.asarray(self.radius, dtype=np.float64)

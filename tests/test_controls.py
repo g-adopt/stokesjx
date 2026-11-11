@@ -18,6 +18,10 @@ Fixtures (plan section 5), all on the reduced PREM table ``cases.t_prem(reduced=
 The references loop over the ranges in numpy and read ``rho0`` from the INPUT profile
 (not from the knot table of the code), so that an index error of the vectorised map of
 several ranges shows (plan risk R10).
+
+Every ``Layers`` with a movable boundary in this file passes ``motion="affine"``, because
+the file tests the affine method (the moved nodes, the knot table, the static limits).
+The tests of the default method, the viscosity cut, are in ``tests/test_controls_cut.py``.
 """
 
 from __future__ import annotations
@@ -91,17 +95,17 @@ def p_red():
 
 @pytest.fixture(scope="module")
 def F1(p_red):
-    return sj.Layers(p_red, B_F1, movable=MOV_F1)
+    return sj.Layers(p_red, B_F1, movable=MOV_F1, motion="affine")
 
 
 @pytest.fixture(scope="module")
 def F3(p_red):
-    return sj.Layers(p_red, B_F3, movable=MOV_F3)
+    return sj.Layers(p_red, B_F3, movable=MOV_F3, motion="affine")
 
 
 @pytest.fixture(scope="module")
 def Fnode(p_red):
-    return sj.Layers(p_red, B_FNODE, movable=MOV_FNODE)
+    return sj.Layers(p_red, B_FNODE, movable=MOV_FNODE, motion="affine")
 
 
 @pytest.fixture(scope="module")
@@ -116,7 +120,8 @@ def S1():
         sys.path.insert(0, str(REPO / "benchmarks"))
     import bench_forward as bf
     p = bf.golden_profile()
-    return sj.Layers(p, np.array([3480, 5700, 5970, 6270, 6370]) * KM, movable={1: (5466.875 * KM, 5970 * KM)})
+    return sj.Layers(p, np.array([3480, 5700, 5970, 6270, 6370]) * KM, movable={1: (5466.875 * KM, 5970 * KM)},
+                     motion="affine")
 
 
 def _fixtures(request, names):
@@ -401,7 +406,7 @@ def test_refusals(p_red):
     with pytest.raises(ValueError, match="concrete profile"):
         jax.jit(lambda rr: sj.Layers(p_red.replace(rho0=rr), B).n_nodes)(p_red.rho0)
     with pytest.raises(ValueError, match="cannot be the input of another"):
-        sj.Layers(sj.Layers(p_red, B, movable=MOV_F1).profile, B)
+        sj.Layers(sj.Layers(p_red, B, movable=MOV_F1, motion="affine").profile, B)
     with pytest.raises(ValueError, match="at least two radii"):
         sj.Layers(p_red, [3480e3])
     with pytest.raises(ValueError, match="finite"):
@@ -414,26 +419,27 @@ def test_refusals(p_red):
         sj.Layers(p_red, [3480e3, 5000e3, 6300e3])
     for key in (0, 5, True, 1.0):
         with pytest.raises(ValueError, match="interior boundary"):
-            sj.Layers(p_red, B, movable={key: (5105.625e3, 5700e3)})
+            sj.Layers(p_red, B, movable={key: (5105.625e3, 5700e3)}, motion="affine")
     with pytest.raises(ValueError, match="strictly inside its movable range"):
-        sj.Layers(p_red, B, movable={1: (5400e3, 5700e3)})
+        sj.Layers(p_red, B, movable={1: (5400e3, 5700e3)}, motion="affine")
     with pytest.raises(ValueError, match="not a node radius"):
-        sj.Layers(p_red, B, movable={1: (5100e3, 5700e3)})
+        sj.Layers(p_red, B, movable={1: (5100e3, 5700e3)}, motion="affine")
     with pytest.raises(ValueError, match="density jump pair"):
         sj.Layers(p_red, B, movable={1: (5105.625e3, 5828.125e3)}, motion="affine")
     # On the F3 layering: overlap, an end at another movable boundary, a density jump.
     with pytest.raises(ValueError, match="overlap"):
-        sj.Layers(p_red, B_F3, movable={1: (4202.5e3, 5286.25e3), 2: (5105.625e3, 5700e3)})
+        sj.Layers(p_red, B_F3, movable={1: (4202.5e3, 5286.25e3), 2: (5105.625e3, 5700e3)}, motion="affine")
     with pytest.raises(ValueError, match="radius of the movable boundary"):
-        sj.Layers(p_red, B_F3, movable={1: (4202.5e3, 5370e3), 2: (5105.625e3, 5700e3)})
+        sj.Layers(p_red, B_F3, movable={1: (4202.5e3, 5370e3), 2: (5105.625e3, 5700e3)}, motion="affine")
     with pytest.raises(ValueError, match="density jump pair"):
         sj.Layers(p_red, B_F3, movable={4: (5700e3, 6008.75e3)}, motion="affine")
     with pytest.raises(ValueError, match="lies inside the movable range"):
-        sj.Layers(p_red, np.array([3480, 4650, 4700, 5700, 6370]) * KM, movable={1: (4202.5e3, 5105.625e3)})
+        sj.Layers(p_red, np.array([3480, 4650, 4700, 5700, 6370]) * KM, movable={1: (4202.5e3, 5105.625e3)},
+                  motion="affine")
     # The positive cases: two ranges that share an end node, and two ranges that end on
     # the two members of one density-jump pair.
-    sj.Layers(p_red, B_F3, movable={1: MOV_F3[1], 2: MOV_F3[2]})
-    sj.Layers(p_red, B_F3, movable={2: MOV_F3[2], 4: MOV_F3[4]})
+    sj.Layers(p_red, B_F3, movable={1: MOV_F3[1], 2: MOV_F3[2]}, motion="affine")
+    sj.Layers(p_red, B_F3, movable={2: MOV_F3[2], 4: MOV_F3[4]}, motion="affine")
 
 
 # ==========================================================================
@@ -473,7 +479,7 @@ def _wide_layers(p, b, rng_=WIDE_RANGE):
     """A single-boundary layering with boundary ``b`` (m) movable in ``rng_`` (m)."""
     bounds = WIDE_BOUNDARIES.copy()
     bounds[1] = b
-    return sj.Layers(p, bounds, movable={1: rng_})
+    return sj.Layers(p, bounds, movable={1: rng_}, motion="affine")
 
 
 def _assert_construction_radius_jit(L, p):

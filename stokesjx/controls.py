@@ -14,15 +14,16 @@ instantaneous Stokes problem differs (NOTES/chunks/c4-controls-derivatives/01-pl
 ``Layers``
     One natural-log viscosity per layer between given boundary radii, a duplicated node
     pair per fixed boundary, and movable boundaries whose radii are controls. A movable
-    boundary moves by one of two methods (``motion``). Under ``"affine"`` it is a node
-    pair, the nodes of its range follow it by two affine maps, ``rho0`` of a moved node is
-    read from the input profile at its new radius, and the gravity is integrated again
-    inside the solver. Under ``"cut"`` it is a viscosity cut: no node moves, and the
-    solver splits the interval that holds the boundary into two exact sub-steps
-    (NOTES/docs/equations.md section 19); the range can hold the density jumps of the
-    input table. ``Layers`` also maps the kernels of the construction table to the fixed
-    radii of the input table (``input_kernels``), so that a density anomaly given on the
-    input table stays where it is when a boundary moves (``fields``, ``sheet_mass``).
+    boundary moves by one of two methods (``motion``). Under ``"cut"``, the default, it is
+    a viscosity cut: no node moves, and the solver splits the interval that holds the
+    boundary into two exact sub-steps (NOTES/docs/equations.md section 19); the range can
+    hold the density jumps of the input table. Under ``"affine"``, on request, it is a
+    node pair, the nodes of its range follow it by two affine maps, ``rho0`` of a moved
+    node is read from the input profile at its new radius, and the gravity is integrated
+    again inside the solver. ``Layers`` also maps the kernels of the construction table to
+    the fixed radii of the input table (``input_kernels``), so that a density anomaly
+    given on the input table stays where it is when a boundary moves (``fields``,
+    ``sheet_mass``).
 ``viscosity_by_node``
     One natural-log viscosity per node of a fixed table.
 ``ControlVector``
@@ -100,9 +101,9 @@ class MovableRange:
         Construction indices of the two range ends: the inner member where a range end
         is a pair (the upper member at ``low``, the lower member at ``high``).
     motion
-        ``"affine"`` (the nodes of the range follow the boundary) or ``"cut"`` (the
-        boundary is a viscosity cut of the fixed node table; ``below``, ``above``,
-        ``radii_below``, ``radii_above`` are empty and ``members`` is ``(-1, -1)``).
+        ``"cut"`` (the boundary is a viscosity cut of the fixed node table; ``below``,
+        ``above``, ``radii_below``, ``radii_above`` are empty and ``members`` is
+        ``(-1, -1)``) or ``"affine"`` (the nodes of the range follow the boundary).
     density_jumps
         The radii in m of the jump pairs of the input table with a ``rho0`` jump strictly
         inside the range, ascending (always empty under ``"affine"``, which refuses them).
@@ -159,15 +160,24 @@ class Layers:
     ``k`` move inside the open range ``(low, high)``. Both ends must be node radii of the
     construction table (an input node, or a pair of another, fixed boundary); at a pair
     the range reads its inner member. The keyword ``motion`` selects the method for all
-    movable boundaries of one ``Layers``: ``"affine"`` (below), ``"cut"`` (the next
-    paragraphs but one), or ``"auto"`` (the default): ``"cut"`` when at least one range
-    holds a density-jump pair of the input strictly inside, ``"affine"`` otherwise.
-    ``Layers.motion`` holds the resolved method (``None`` without a movable boundary).
-    Under ``"auto"`` every layering whose ranges hold no density jump runs the affine
-    method. ``motion="cut"`` is accepted for every movable range: on a range without a
-    density jump, under an incompressible formulation, the cut removes every kink of the
-    affine method and is as fast (NOTES/chunks/c4b-boundaries-across-jumps/01-plan.md
-    section 2.2).
+    movable boundaries of one ``Layers``: ``"cut"``, the default for every range (the
+    paragraph "The viscosity cut" below), or ``"affine"`` on request (the next
+    paragraph). ``Layers.motion`` holds the method (``None`` without a movable boundary).
+    The method does not depend on where the density jumps of the table are. The cut is
+    the default for three reasons. Under an incompressible formulation its derivative
+    with respect to the radius has no kinks: on the tables T1 (137-node PREM table, range
+    (5060.5, 5700) km, ``lmax = 50``) and T2 (257-node refined table, range (5466.9, 5970)
+    km, ``lmax = 100``) of ``benchmarks/measure_kink.py``, ``E_rms`` (below, "Measured
+    kinks of the affine method") is at most 1.2e-11 nat for the smooth and the LEBEDEV
+    anomaly and 7.6e-11 nat for the rough anomaly, against 0.103 and 0.137 nat for the
+    affine method, and the relative jump of the derivative is at most 3.2e-11
+    (NOTES/benchmarks/c6-kink-default.json). On the 137-node PREM table the cut is within
+    1e-6 of a fixed boundary pair at the new radius, where the affine method is within
+    5e-4 to 2e-3. It is as fast as the affine method. Under TALA the cut has small kinks at the
+    input nodes also on a range without a density jump: ``E_rms`` 0.036 nat at a
+    viscosity contrast of 10 and 0.061 nat at 1.1 (range (5700, 5970) km of the 137-node
+    table, NOTES/benchmarks/c5-kink-t3te.json); a range with a density jump inside adds
+    the value jump of the paragraph "TALA and a density jump inside a range".
 
     **The affine method.** Inside the range, with the construction radius ``r0`` and
     the new radius ``r``, the nodes below the pair map affinely from ``[low, r0]`` onto
@@ -196,7 +206,7 @@ class Layers:
     density jumps (NOTES/PLAN.md ruling 14): on a PREM-like table a boundary near 670 km
     depth moves freely across the 670 km density jump.
 
-    **The viscosity cut (motion="cut").** A movable boundary inserts no node: the
+    **The viscosity cut (motion="cut", the default).** A movable boundary inserts no node: the
     construction table is the input table with the pairs of the fixed boundaries, and it
     does not move. The boundary radius ``c`` is the profile leaf ``cut_radius`` (one per
     movable boundary, in the order of ``movable_index``), and the structure records the
@@ -338,8 +348,11 @@ class Layers:
     only.
 
     **Gravity.** The profile carries no gravity array; ``stokes_kernels`` integrates the
-    hydrostatic gravity from ``rho0`` and the moved radii inside the differentiated
-    function (``propagate.background_gravity``), so it follows the boundary.
+    hydrostatic gravity from ``rho0`` and the radii of the profile inside the
+    differentiated function (``propagate.background_gravity``). Under ``"cut"`` the
+    radii and ``rho0`` are those of the construction table at every position, so the
+    gravity does not depend on the boundary radius. Under ``"affine"`` it is integrated
+    on the moved radii and follows the boundary.
 
     **The clamp.** A concrete boundary vector is checked: a fixed entry that differs
     from its construction radius, or a movable one outside its open range, raises. A
@@ -389,17 +402,19 @@ class Layers:
         F_o[l, m] = sum_i K_o[l](r_i) w_i drho[i, l, m],
 
     with the input radii ``r_i``, the static trapezoid weights ``input_weights`` and the
-    kernel of the current profile at the input radius (``input_kernels``): the kernel of
-    its own construction node for an input node outside every movable range, and the
-    linear interpolation between the two moved nodes that bracket its radius for an
-    input node strictly inside a range. Use ``layers.fields(K, drho)``; ``fields.apply``
-    refuses the profile of a movable ``Layers``. A caller whose density is given on the
-    input table uses ``Layers.fields`` also when no boundary moves, so that the field
-    does not change when a boundary is made movable: ``fields.apply(K, d, layers.profile)``
-    is the trapezoid rule of the construction table, a different quadrature (they differ
-    by up to 9e-4 of the geoid for a density with an independent value per node).
-    ``sheet_mass`` gives the same field in the transposed form (the anomaly as sheet
-    masses on the construction nodes).
+    kernel of the current profile at the input radius (``input_kernels``). Under
+    ``"cut"`` (the default) no node moves, and every input node takes the kernel of its
+    own construction node (a static gather). Under ``"affine"`` an input node outside
+    every movable range does the same, and an input node strictly inside a range takes
+    the linear interpolation between the two moved nodes that bracket its radius. Use
+    ``layers.fields(K, drho)``; ``fields.apply`` refuses the profile of a ``Layers``
+    with a movable boundary under ``motion="affine"``. A caller whose density is given
+    on the input table uses ``Layers.fields`` under either method and also when no
+    boundary moves, so that the field does not change when a boundary is made movable:
+    ``fields.apply(K, d, layers.profile)`` is the trapezoid rule of the construction
+    table, a different quadrature (they differ by up to 9e-4 of the geoid for a density
+    with an independent value per node). ``sheet_mass`` gives the same field in the transposed
+    form (the anomaly as sheet masses on the construction nodes).
 
     **Accuracy of the density map (affine method).** The linear interpolation of the kernels between
     stretched nodes has an error of second order in the input node spacing times the
@@ -452,9 +467,10 @@ class Layers:
     (NOTES/PLAN.md ruling 15): place the construction radius at or above the middle of
     its range, measured from the range end whose input radii are equally spaced. This
     moves the largest group out of the range and halves the estimate on the PREM table.
-    A C1 interpolation of the kernel rows in ``r`` would remove the group jumps for every
-    ``r0``. The package does not implement it: the cut method (above) has no such kinks
-    under an incompressible formulation. The kinks never bias a Metropolis-corrected
+    The usage rule applies to ``motion="affine"`` only. A C1 interpolation of the kernel
+    rows in ``r`` would remove the group jumps for every ``r0``. The package does not
+    implement it: the cut, the default method (NOTES/PLAN.md ruling 17), has no such
+    kinks under an incompressible formulation. The kinks never bias a Metropolis-corrected
     sampler (leapfrog stays volume preserving and reversible); they lower the acceptance
     rate. Measured with the HMC example (``examples/hmc_layers.py``, runs B and C of
     NOTES/chunks/c5-integration/03-implementation.md): on a range that ends at the 670 km
@@ -474,20 +490,20 @@ class Layers:
     movable
         ``None`` or ``{boundary index: (low, high)}`` in m, with indices in ``1 .. B - 2``.
     motion
-        ``"auto"`` (default), ``"affine"`` or ``"cut"``: the method of the movable
-        boundaries (above).
+        ``"cut"`` (default) or ``"affine"``: the method of the movable boundaries
+        (above).
 
     Attributes
     ----------
     profile
         The construction profile: the input with the inserted pairs, ``eta`` of the
         input (interpolated at inserted nodes; every call overwrites it), the scalar
-        leaves of the input, and a structure with ``limits`` when a boundary is movable
-        under ``"affine"``, or with ``cuts`` and the leaf ``cut_radius`` (the construction
-        radii) under ``"cut"``.
+        leaves of the input, and a structure with ``cuts`` and the leaf ``cut_radius``
+        (the construction radii) when a boundary is movable under ``"cut"``, or with
+        ``limits`` under ``"affine"``.
     motion
-        The resolved method: ``"affine"``, ``"cut"``, or ``None`` without a movable
-        boundary.
+        The method of the movable boundaries, the keyword ``motion``: ``"cut"`` or
+        ``"affine"``, and ``None`` without a movable boundary.
     input_profile
         The profile given to the constructor.
     input_weights
@@ -518,7 +534,7 @@ class Layers:
     Raises
     ------
     ValueError
-        On a ``motion`` that is not one of the three strings; on a traced profile or a
+        On a ``motion`` that is not one of the two strings; on a traced profile or a
         profile whose structure has limits or cuts; on boundaries
         that are not a finite vector of at least two radii, not strictly ascending,
         that do not start at the CMB or end at the surface; on a boundary on three or
@@ -530,11 +546,11 @@ class Layers:
     """
 
     def __init__(self, profile: RadialProfile, boundaries, *, movable: dict | None = None,
-                 motion: Literal["auto", "affine", "cut"] = "auto"):
+                 motion: Literal["cut", "affine"] = "cut"):
         if not isinstance(profile, RadialProfile):
             raise ValueError(f"Layers takes a RadialProfile, got {type(profile).__name__}")
-        if not isinstance(motion, str) or motion not in ("auto", "affine", "cut"):
-            raise ValueError(f"motion must be 'auto', 'affine' or 'cut', got {motion!r}")
+        if not isinstance(motion, str) or motion not in ("cut", "affine"):
+            raise ValueError(f"motion must be 'cut' or 'affine', got {motion!r}")
         for name in _LEAF_NAMES:
             if _is_traced(getattr(profile, name)):
                 raise ValueError("Layers takes a concrete profile: it fixes the structure of the node table "
@@ -557,16 +573,13 @@ class Layers:
                 raise ValueError(f"movable is keyed by the index of an interior boundary, 1 to {B - 2} (the CMB "
                                  f"and the surface are never movable); got {key!r}")
         movable = {int(k): (float(v[0]), float(v[1])) for k, v in movable.items()}
-        # The density-jump pairs of the input table strictly inside each range, and the
-        # method of the movable boundaries: "auto" is "cut" when a range holds one, and
-        # "affine" otherwise; None without a movable boundary.
+        # The density-jump pairs of the input table strictly inside each range: recorded
+        # in MovableRange.density_jumps under "cut", refused under "affine"
+        # (_movable_ranges). The method of the movable boundaries is the keyword itself:
+        # "cut" (the default) or "affine", for every range of this Layers, whether or not a
+        # range holds a density jump; None without a movable boundary.
         jumps_in = {k: self._density_jumps(r_in, rho_in, lo, hi) for k, (lo, hi) in movable.items()}
-        if not movable:
-            self.motion = None
-        elif motion == "auto":
-            self.motion = "cut" if any(jumps_in.values()) else "affine"
-        else:
-            self.motion = motion
+        self.motion = motion if movable else None
         cut = self.motion == "cut"
         # The boundaries that insert a node pair: every interior boundary under "affine",
         # the fixed ones only under "cut" (a cut is not a node of the table).
@@ -813,8 +826,8 @@ class Layers:
                 if not np.any(radius == end):
                     raise ValueError(f"the end {_km(end)} of the movable range of boundary {k} is not a node "
                                      "radius of the construction table; a range end must be a node (or the "
-                                     "pair of a fixed boundary), so that it stays where it is while the "
-                                     "nodes inside move")
+                                     "pair of a fixed boundary), so that it stays where it is when the "
+                                     "boundary moves")
             # Under "affine" a pair of the input with a rho0 jump strictly inside the range
             # would move the density structure with the nodes (lovejx "elastic
             # interface"). Under "cut" no node moves, and the density jumps stay where
@@ -826,8 +839,8 @@ class Layers:
                                  f"jump pair of the input at {_km(r_in[i])} (rho0 {rho_in[i]} to "
                                  f"{rho_in[i + 1]} kg/m^3); under motion='affine' the nodes of a range move with "
                                  "its boundary and would carry the jump along, so the boundary cannot cross a "
-                                 "density jump: use motion='cut' or 'auto', or choose range ends that leave it "
-                                 "outside")
+                                 "density jump: use motion='cut' (the default), or choose range ends that leave "
+                                 "it outside")
             others = [k2 for k2 in range(start.size) if k2 != k and low < start[k2] < high]
             if others:
                 k2 = others[0]
@@ -888,21 +901,22 @@ class Layers:
         """The radii of boundary ``index`` at which the derivative of the map jumps,
         inside the closed clamp range, ascending, and their kinds (host, numpy).
 
-        Kind 1: a moved node of the range over an input radius strictly inside the range
-        (the knot table of ``rho0`` and the bracket of the density map change interval).
-        Kind 2: the pair over such an input radius (an input node changes side of the
-        viscosity jump). Kind 3: the construction radius ``r0``, where every moved node
-        sits on its own input radius. A node ``j`` below the boundary crosses the input
-        radius ``r_k`` at ``r = low + (r_k - low) (r0 - low) / (r_j - low)``; a node above
-        at ``r = high - (high - r_k) (high - r0) / (high - r_j)``.
+        Under ``motion="cut"`` (the default) no node moves, and two kinds exist. Kind 2:
+        the cut over an input radius inside the clamp range that is not a density-jump
+        pair (the cut changes interval; the map is continuously differentiable there under
+        an incompressible formulation, with a kink of about 2e-4 relative under TALA).
+        Kind 4: the cut over a density-jump pair of the input
+        (``MovableRange.density_jumps``; continuously differentiable under an
+        incompressible formulation, a jump of the value under TALA). A pair is one radius.
 
-        Under ``motion="cut"`` no node moves, and only two kinds exist. Kind 2: the cut
-        over an input radius strictly inside the range that is not a density-jump pair
-        (the cut changes interval; the map is continuously differentiable there under an
-        incompressible formulation, with a kink of about 2e-4 relative under TALA). Kind
-        4: the cut over a density-jump pair of the input (``MovableRange.density_jumps``;
-        continuously differentiable under an incompressible formulation, a jump of the
-        value under TALA). A pair is one radius.
+        Under ``motion="affine"`` three kinds exist. Kind 1: a moved node of the range
+        over an input radius strictly inside the range (the knot table of ``rho0`` and the
+        bracket of the density map change interval). Kind 2: the pair over such an input
+        radius (an input node changes side of the viscosity jump). Kind 3: the
+        construction radius ``r0``, where every moved node sits on its own input radius. A
+        node ``j`` below the boundary crosses the input radius ``r_k`` at
+        ``r = low + (r_k - low) (r0 - low) / (r_j - low)``; a node above at
+        ``r = high - (high - r_k) (high - r0) / (high - r_j)``.
 
         Returns
         -------
@@ -985,11 +999,13 @@ class Layers:
     @property
     def width_factor(self) -> float:
         """The largest ratio of the width limit of an interval to its construction width
-        (1.0 without a movable boundary). The Pade plan is built for the limits, so a
-        large factor costs squarings and, with them, rounding: a factor 4 to 17 in the
-        error of the kernels for three more squarings, up to 1.6e-12 at a width factor of
-        7.7 (NOTES/chunks/c4-controls-derivatives/04-review-physics-r2.md, minor 1). Put
-        the construction radius near the middle of its range (plan D3)."""
+        (1.0 without a movable boundary and under ``"cut"``, where no node moves and the
+        structure has no limits). Under ``"affine"`` the Pade plan is built for the
+        limits, so a large factor costs squarings and, with them, rounding: a factor 4 to
+        17 in the error of the kernels for three more squarings, up to 1.6e-12 at a width
+        factor of 7.7 (NOTES/chunks/c4-controls-derivatives/04-review-physics-r2.md, minor
+        1). Under ``"affine"``, put the construction radius near the middle of its range
+        (plan D3)."""
         lim = self.profile.structure.limits
         if lim is None:
             return 1.0
@@ -1084,9 +1100,10 @@ class Layers:
             if bad.size:
                 i = int(bad[0])
                 raise ValueError(f"rho0 has different values {r[i]} and {r[i + 1]} kg/m^3 on the two nodes {i} and "
-                                 f"{i + 1} at {_km(self._construction_radius[i])}, a pair without a density jump "
-                                 "in or under a movable range (or a duplicated node); its two members must "
-                                 "carry one value, or the moved nodes meet a jump of the knot table")
+                                 f"{i + 1} at {_km(self._construction_radius[i])}, a duplicated node (or, under "
+                                 "motion='affine', a pair without a density jump in or under a movable range); "
+                                 "its two members must carry one value (under 'affine' the moved nodes would "
+                                 "otherwise meet a jump of the knot table)")
         rho_ctrl = (jnp.asarray(self._construction_rho0) if rho0 is None
                     else jnp.asarray(rho0, dtype=jnp.float64))
         if cut:
@@ -1201,10 +1218,12 @@ class Layers:
         -------
         ``Kernels`` with every kernel ``(L, N_in)``, ``degree_one_imbalance`` ``(N_in,)``
         mapped with the same weights, ``radius`` the static input radius, and the
-        degrees and the frame of the input. An input node outside every movable range
-        (the range ends included) takes the kernel of its construction node; an input
-        node strictly inside a range takes the linear interpolation in ``r`` between the
-        two moved nodes that bracket its radius (``_bracket``). At the construction radii
+        degrees and the frame of the input. Under ``"cut"`` (the default) and without a
+        movable boundary every input node takes the kernel of its construction node.
+        Under ``"affine"`` an input node outside every movable range (the range ends
+        included) does the same, and an input node strictly inside a range takes the
+        linear interpolation in ``r`` between the two moved nodes that bracket its radius
+        (``_bracket``). At the construction radii
         every dynamic input node is at a tie with its own node, the weight is exactly 1,
         and the map equals the static gather bit for bit, with one exception: the upper
         member of an input viscosity-only pair inside a movable range (or under a
@@ -1247,10 +1266,11 @@ class Layers:
         input nodes, kg/m^2, deposited onto the construction nodes, ``(N, *batch, Ld+1,
         Ld+1)``.
 
-        An input node outside every movable range puts its sheet mass on its own
-        construction node; a dynamic input node splits it with the weights ``1 - t`` and
-        ``t`` onto the two moved nodes that bracket its radius (the current radius is read
-        from ``kernels.radius``). ``fields.radial_integral(kernels, sheet_mass, ones(N))``
+        Under ``"cut"`` (the default) every input node puts its sheet mass on its own
+        construction node. Under ``"affine"`` an input node outside every movable range
+        does the same, and an input node strictly inside a range splits it with the
+        weights ``1 - t`` and ``t`` onto the two moved nodes that bracket its radius (the
+        current radius is read from ``kernels.radius``). ``fields.radial_integral(kernels, sheet_mass, ones(N))``
         equals ``self.fields(kernels, density)`` to rounding. It costs ``O(N L^2)`` per
         batch entry against ``O(4 L N_in)`` of ``input_kernels``; use it for a density on
         the construction table and for the adjoint test of the map."""

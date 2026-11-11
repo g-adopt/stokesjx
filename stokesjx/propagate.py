@@ -181,8 +181,9 @@ def static_plan(structure: NodeStructure, config: StokesConfig,
        density limit ``Numerics.rho0_max / rho_s`` (0 under NO_SELF_GRAVITY) and, under
        TALA, the limit ``Numerics.kappa_h_max`` of ``|kappa_h|`` on every ordinary
        interval (zero at a pair, whose step is the closed form of eq. 12.3;
-       CONVENTIONS 2). With ``structure.limits`` (a table with movable boundaries) the
-       widths are the widened limits (``NodeStructure.width_bounds``).
+       CONVENTIONS 2). With ``structure.limits`` (a table with movable boundaries under
+       ``motion="affine"``) the widths are the widened limits
+       (``NodeStructure.width_bounds``).
 
     6. ``tala_cut_across_pair``: under TALA, whether a jump pair lies strictly inside the
        range of a viscosity cut (``structure.cuts``). The plan only records it; the

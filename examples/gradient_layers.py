@@ -20,8 +20,8 @@ numbers as a table.
 The problem. The layering is that of the HMC example (``hmc_layers.py``): boundaries at
 3480, ``r_b``, 5970, 6270 and 6370 km, so four layers (lower mantle, ``r_b`` to 400 km,
 400 to 100 km, the lid). Boundary 1 is movable in (5466.875, 5970) km, a range that holds
-the 670 km density jump of the table at 5700 km; ``Layers`` resolves ``motion="auto"`` to
-the viscosity cut, so the boundary crosses the density jump freely
+the 670 km density jump of the table at 5700 km. The default method of ``Layers`` is the
+viscosity cut, so the boundary crosses the density jump freely
 (``stokesjx.controls.Layers``). The density anomaly is the smooth anomaly of
 ``earth_model.smooth_density`` (seed 7) on the input table, and the field is
 ``Layers.fields`` (the density stays on the input table when the boundary moves). The

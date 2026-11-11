@@ -5,8 +5,9 @@ Run from the repository root:
 
     python benchmarks/measure_kink.py [--tables T1 T2 T1s] [--json PATH] [--overwrite]
 
-The map from a movable boundary radius ``r_b`` to the fields is continuous and piecewise
-smooth. Its derivative jumps at "crossings": a moved node over an input radius (kind 1:
+The tables T1, T2, T1s and T2s measure the affine method (``Layers(..., motion="affine")``).
+Under that method the map from a movable boundary radius ``r_b`` to the fields is
+continuous and piecewise smooth. Its derivative jumps at "crossings": a moved node over an input radius (kind 1:
 the knot table of ``rho0`` and the bracket of the density map change interval), the pair
 over an input radius (kind 2: an input node changes side of the viscosity jump), and the
 construction radius ``r0`` (kind 3). This script uses the package ``Layers`` and
@@ -42,10 +43,11 @@ Decision (plan 8.4): ``E_TOL = 0.1`` nat. If ``E_rms <= E_TOL`` at every grid po
 ``sigma_r``, on T1 and T2, for the decision set (the smooth anomaly of ``tests/densities.py``
 and the LEBEDEV tomography density), linear interpolation stays. The measured values
 exceed the limit narrowly (0.103 and 0.137 nat). The outcome (NOTES/PLAN.md rulings 15 and
-17): the affine method keeps the usage rule of the ``Layers`` docstring (the construction
-radius at or above the middle of its range), and the viscosity cut (``motion="cut"``) has
-no such kinks under an incompressible formulation (the tables T1c and T2c below). The
-rough anomaly (an independent value per input node) is the stress case, recorded only.
+17): the viscosity cut is the default method of ``Layers`` for every movable range, and it
+has no such kinks under an incompressible formulation (the tables T1c, T2c, T1d and T2d
+below); the affine method, on request, keeps the usage rule of the ``Layers`` docstring
+(the construction radius at or above the middle of its range). The rough anomaly (an
+independent value per input node) is the stress case, recorded only.
 
 Tables:
 
@@ -81,11 +83,16 @@ within ``1.5 sigma_r`` of the pair,
     E_value(r_true) = sqrt(lam^2 ([N] . (N_mid - N(r_true)))^2 + lam |[N]|^2),
 
 with ``[N] = N(J+) - N(J-)``, ``N_mid`` their mean and ``lam`` of the likelihood above; its
-lower limit is ``sqrt(lam) |[N]| = L / sigma_r``. Tables (``--tables T1c T2c T3 T4 T3t``):
+lower limit is ``sqrt(lam) |[N]| = L / sigma_r``. Tables (``--tables T1c T2c T3 T4 T3t``,
+``--tables T1d T2d``):
 
 - T1c, T2c: T1 and T2 with ``motion="cut"`` (no density jump inside the range);
+- T1d, T2d: T1 and T2 (the same table, boundaries, range, construction radius,
+  viscosities and ``lmax``) built WITHOUT the keyword ``motion``, so with the package
+  default; ``measure_cut`` asserts that the default is the cut. They measure the kinks of
+  the default method on the chunk 4 tables (NOTES/PLAN.md section 9 item 2);
 - T3: ``t_prem()``, boundaries 3480, 5700, 5970, 6270, 6370 km, the 5700 km boundary movable
-  in (5466.875, 5970) km (it holds the 670 km density jump; ``r0 = J``), viscosities 1e22,
+  (default method) in (5466.875, 5970) km (it holds the 670 km density jump; ``r0 = J``), viscosities 1e22,
   1e21, 3e20, 1e22 Pa s, ``lmax = 50``;
 - T4: ``t_prem()``, boundaries 3480, 5800, 6270, 6370 km, movable in (5466.875, 6150) km
   (it holds the 5700 and 5970 km jumps), 1e22, 3e20, 1e22 Pa s, ``lmax = 50``;
@@ -98,9 +105,17 @@ lower limit is ``sqrt(lam) |[N]| = L / sigma_r``. Tables (``--tables T1c T2c T3 
   1.1 (names ``T3te-10`` and ``T3te-1.1``; ``T3te`` runs both). It measures the kinks that
   remain at the input nodes under TALA when the usage rule is followed.
 
-Rule (gate G6 of the c4b plan): on T1c, T2c, T3 and T4, ``rho_max <= 1e-8``, ``E_rms <= 1e-3``
-nat and ``E_value <= 1e-6`` nat for the three anomalies and both ``sigma_r``. T3t is recorded.
-The JSON goes to ``NOTES/benchmarks/c4b-kink.json`` (``--json``).
+Rule (gate G6 of the c4b plan): on T1c, T2c, T1d, T2d, T3 and T4, ``rho_max <= 1e-8``,
+``E_rms <= 1e-3`` nat and ``E_value <= 1e-6`` nat for the three anomalies and both
+``sigma_r``. T3t is recorded. The JSON goes to ``NOTES/benchmarks/c4b-kink.json``
+(``--json``).
+
+Rule of the default (``decision_default``, gate G6 of NOTES/chunks/c6-cut-default/01-plan.md):
+the largest ``E_rms`` of T1d and T2d over the three anomalies and both ``sigma_r`` is at most
+``E_RMS_DEFAULT = 1e-4`` nat. The limit is three orders of magnitude below the affine values
+on the same tables (0.103 and 0.137 nat) and far above the rounding of the cut (about 1e-11
+nat on T1c and T2c), so it fails for a default that is not the cut and for a cut with
+kinks. Command: ``--tables T1d T2d --json NOTES/benchmarks/c6-kink-default.json``.
 """
 
 from __future__ import annotations
@@ -140,7 +155,8 @@ def table(name: str):
         p = profile_from_table(cases.t_prem())
         r = np.asarray(p.radius)
         r0 = 5370e3 if name == "T1" else 5395e3
-        L = sj.Layers(p, np.array([3480e3, r0, 5700e3, 5970e3, 6270e3, 6370e3]), movable={1: (float(r[70]), 5700e3)})
+        L = sj.Layers(p, np.array([3480e3, r0, 5700e3, 5970e3, 6270e3, 6370e3]), movable={1: (float(r[70]), 5700e3)},
+                      motion="affine")
         return L, np.log(np.array([3e22, 1e22, 1e21, 3e20, 1e22])), 50
     if name in ("T2", "T2s"):
         from bench_forward import lebedev_refined
@@ -149,7 +165,8 @@ def table(name: str):
         # T2s: the upper range end at the node below 5900 km, so that r0 = 5700 km sits at
         # 54 % of its range and the group s = 2 (2 r0 - low = 5933 km) lies outside it.
         high = 5970e3 if name == "T2" else float(r[r <= 5900e3][-1])
-        L = sj.Layers(p, np.array([3480e3, 5700e3, 5970e3, 6270e3, 6370e3]), movable={1: (5466.875e3, high)})
+        L = sj.Layers(p, np.array([3480e3, 5700e3, 5970e3, 6270e3, 6370e3]), movable={1: (5466.875e3, high)},
+                      motion="affine")
         return L, np.log(HAGER4), 100
     raise ValueError(name)
 
@@ -325,9 +342,11 @@ def measure(name: str) -> dict:
     return rec
 
 
-CUT_TABLES = ("T1c", "T2c", "T3", "T4")
+CUT_TABLES = ("T1c", "T2c", "T1d", "T2d", "T3", "T4")
+DEFAULT_TABLES = ("T1d", "T2d")
 RHO_C1 = 1e-8            # c4b G6: the derivative jump of an incompressible cut table
 E_RMS_CUT = 1e-3         # nat
+E_RMS_DEFAULT = 1e-4     # nat: the kinks of the default method on T1d and T2d (decision_default)
 E_VALUE_CUT = 1e-6       # nat
 D_CUT = 1.0              # m: the extrapolation step at a crossing of a cut table
 
@@ -336,16 +355,18 @@ def cut_table(name: str):
     """``(Layers, log_eta, cfg)`` of a cut table (module docstring)."""
     import cases
     from adapters import profile_from_table
-    if name == "T1c":
+    # T1c and T2c pass motion="cut"; T1d and T2d pass no keyword (the package default).
+    kw = {"motion": "cut"} if name in ("T1c", "T2c") else {}
+    if name in ("T1c", "T1d"):
         p = profile_from_table(cases.t_prem())
         r = np.asarray(p.radius)
         L = sj.Layers(p, np.array([3480e3, 5370e3, 5700e3, 5970e3, 6270e3, 6370e3]),
-                      movable={1: (float(r[70]), 5700e3)}, motion="cut")
+                      movable={1: (float(r[70]), 5700e3)}, **kw)
         return L, np.log(np.array([3e22, 1e22, 1e21, 3e20, 1e22])), sj.StokesConfig(lmax=50)
-    if name == "T2c":
+    if name in ("T2c", "T2d"):
         from bench_forward import lebedev_refined
         L = sj.Layers(lebedev_refined(), np.array([3480e3, 5700e3, 5970e3, 6270e3, 6370e3]),
-                      movable={1: (5466.875e3, 5970e3)}, motion="cut")
+                      movable={1: (5466.875e3, 5970e3)}, **kw)
         return L, np.log(HAGER4), sj.StokesConfig(lmax=100)
     p = profile_from_table(cases.t_prem())
     if name == "T3" or (name.startswith("T3t") and not name.startswith("T3te")):
@@ -502,6 +523,21 @@ def decision_cut(records) -> dict:
     return dict(RHO_C1=RHO_C1, E_rms_limit=E_RMS_CUT, E_value_limit=E_VALUE_CUT, holds=bool(holds), rows=rows)
 
 
+def decision_default(records) -> dict:
+    """The rule of the default method (module docstring): the largest ``E_rms`` of T1d and
+    T2d over the three anomalies and both ``sigma_r``, and ``holds`` when it is at most
+    ``E_RMS_DEFAULT``. ``rows`` holds the largest value per table and anomaly."""
+    rows = {}
+    for rec in records:
+        if rec["table"] not in DEFAULT_TABLES:
+            continue
+        for a, arec in rec["anomalies"].items():
+            rows[f"{rec['table']} {a}"] = max(s["E_rms_max"] for s in arec["sigma"].values())
+    worst = max(rows.values(), default=None)
+    holds = bool(rows) and worst <= E_RMS_DEFAULT
+    return dict(E_RMS_DEFAULT=E_RMS_DEFAULT, holds=bool(holds), E_rms_max=worst, rows=rows)
+
+
 def decision(records) -> dict:
     """The rule of plan 8.4 on T1 and T2 for the decision set (smooth, LEBEDEV)."""
     worst = {}
@@ -541,10 +577,14 @@ def main(argv=None):
               f"E_rms <= {E_RMS_CUT} nat, E_value <= {E_VALUE_CUT} nat: {dec_cut['holds']}")
         for k, v in dec_cut["rows"].items():
             print(f"   {k}: rho max {v['rho_max']:.2e}, E_rms max {v['E_rms_max']:.2e}, E_value max {v['E_value_max']:.2e}")
+    dec_default = decision_default(records)
+    if dec_default["rows"]:
+        print(f"default method on {', '.join(sorted({k.split()[0] for k in dec_default['rows']}))}: "
+              f"E_rms <= {E_RMS_DEFAULT} nat: {dec_default['holds']} (largest {dec_default['E_rms_max']:.2e} nat)")
     out = dict(date=datetime.datetime.now().isoformat(timespec="seconds"), host=platform.node(),
                jax=jax.__version__, load_start=load0, load_end=os.getloadavg(), seconds=time.time() - t0,
                group_gap_m=GROUP_GAP, grid_step_m=GRID_STEP, sigma_r_m=list(SIG_R), records=records, decision=dec,
-               decision_cut=dec_cut)
+               decision_cut=dec_cut, decision_default=dec_default)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(out, indent=1))
     print(f"written {path}")

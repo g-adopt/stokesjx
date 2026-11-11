@@ -21,7 +21,7 @@ resolve.
 
 Every size uses the layering of the HMC example (``examples/hmc_layers.py``): boundaries
 at 3480, 5750, 5970, 6270 and 6370 km, boundary 1 movable in (5466.875, 5970) km across
-the 670 km density jump, so ``Layers`` resolves ``motion="auto"`` to the viscosity cut.
+the 670 km density jump; ``Layers`` uses its default method, the viscosity cut.
 
 Programs (each one ``jax.jit``):
 

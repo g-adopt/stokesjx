@@ -182,11 +182,12 @@ def apply(kernels: Kernels, density, profile: RadialProfile) -> Fields:
     The density rule (NOTES/chunks/c4-controls-derivatives/01-plan.md D11). The density
     is given on the node table of ``profile``. For a ``controls.Layers`` with movable
     boundaries the density of a field is given on the INPUT table of the ``Layers`` and
-    does not move with a boundary; that field is ``Layers.fields(kernels, density)``, and
-    this function refuses the profile of a movable ``Layers`` (its structure has
-    ``limits``) with ``ValueError``, so that an anomaly cannot be attached to the moving
-    nodes by mistake. A ``Layers`` without a movable boundary, or with viscosity cuts only
-    (``motion="cut"``: no node moves), is accepted here: this is
+    does not move with a boundary; that field is ``Layers.fields(kernels, density)``.
+    This function refuses the profile of a ``Layers`` with a movable boundary under
+    ``motion="affine"`` (its structure has ``limits``) with ``ValueError``, so that an
+    anomaly cannot be attached to the moving nodes by mistake. A ``Layers`` without a
+    movable boundary, or with viscosity cuts (``motion="cut"``, the default: no node
+    moves), is accepted here: this is
     then the trapezoid rule of the construction table, for a density that the caller
     gives on that table (for example the output of ``Layers.sheet_mass``); a density on
     the input table goes through ``Layers.fields`` also then. ``radial_integral`` with

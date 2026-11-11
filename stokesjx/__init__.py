@@ -40,11 +40,11 @@ synthesis and the Gauss-Legendre transform of lovejx. CODE-A's file formats are 
 written by ``stokesjx.io.legacy`` (imported on use).
 
 Controls (``stokesjx.controls``): ``Layers`` maps one log viscosity per layer and the
-radii of movable viscosity boundaries to a profile (either the nodes of a range follow
-the boundary affinely, or the boundary is a viscosity cut of the fixed node table that
-the solver splits into two exact sub-steps and that can cross the density jumps of the
-table; ``rho0`` stays where the input profile puts it, and a density anomaly stays on
-the input table through ``Layers.fields``); ``viscosity_by_node`` maps one log
+radii of movable viscosity boundaries to a profile (by default the boundary is a
+viscosity cut of the fixed node table that the solver splits into two exact sub-steps
+and that can cross the density jumps of the table; with ``motion="affine"`` the nodes of
+a range follow the boundary affinely; ``rho0`` stays where the input profile puts it,
+and a density anomaly stays on the input table through ``Layers.fields``); ``viscosity_by_node`` maps one log
 viscosity per node; ``ControlVector`` turns a pytree of controls into one vector with a
 jitted value and gradient and a NumPy front, and ``fields.spectral_misfit`` is a weighted
 degree-power misfit. The prior and the sampler are the caller's.
@@ -58,9 +58,9 @@ Public names (``__all__``):
   ``BoundaryCondition`` (the base class of ``FreeSlip`` and ``NoSlip``),
   ``DegreeOneFrame`` (the frame request of degree 1);
 - profile: ``RadialProfile`` (the pytree of the radial model), ``NodeStructure`` (its
-  static node table), ``NodeLimits`` (the static limits of a movable layering),
-  ``integrate_gravity`` (the hydrostatic gravity of eq. 6.1), ``Units`` (constants and
-  the density scale);
+  static node table), ``NodeLimits`` (the static limits of a movable layering under
+  ``motion="affine"``), ``integrate_gravity`` (the hydrostatic gravity of eq. 6.1),
+  ``Units`` (constants and the density scale);
 - fields: ``Fields``, ``apply``, ``quadrature_weights`` (the trapezoid weights),
   ``spectral_misfit``, ``surface_gravity`` (``g(R)`` of the profile),
   ``gravity_anomaly``, ``admittance``;

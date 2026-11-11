@@ -2,9 +2,9 @@
 (NOTES/chunks/c4b-boundaries-across-jumps/01-plan.md sections 9.1 to 9.4, gates G1, G3 to
 G9; NOTES/PLAN.md ruling 14; NOTES/docs/equations.md section 19).
 
-Under ``Layers(..., motion="cut")`` (the default ``"auto"`` when a movable range holds a
-density-jump pair) a movable viscosity boundary is a cut inside one interval of the
-FIXED node table, at a traced radius ``c``. The interval that holds ``c`` is split into
+Under ``Layers(..., motion="cut")``, the default for every movable range (NOTES/PLAN.md
+ruling 17), a movable viscosity boundary is a cut inside one interval of the FIXED node
+table, at a traced radius ``c``. The interval that holds ``c`` is split into
 two exact sub-steps; no node moves, and the density jumps of the input table stay where
 they are.
 
@@ -21,6 +21,11 @@ pairs at 5700, 5970 and 6150 km, a viscosity-only pair at 6270 km):
 - FJ1x: FJ1 with a fixed boundary at 4000 km between two input nodes (an inserted pair).
 - T3-full and T4-full (slow rows and V7): the layouts of FJ1 (with ``r0 = J`` = 5700 km)
   and FJ2 on the full ``t_prem()`` table (137 input nodes).
+- F1d: the chunk 4 layout F1 (boundary 1 movable in (5105.625, 5700) km, a range without
+  a density jump) built with the default method; the V2 rows of the default.
+
+The helpers ``layers`` and ``kernel_fn`` pass no keyword ``motion`` unless a test names
+one, so every layout without an explicit method is built with the package default.
 
 Every reference table is built with numpy by ``tests/reference_cut.py`` from the input
 table, the boundary radii and the layer viscosities (never from a profile that
@@ -137,8 +142,12 @@ LAYOUTS = {
     "FJ1x": (True, B_FJ1X, {2: (5466.875e3, 5970e3)}, ETA_FJ1X),
     "T3full": (False, np.array([3480, 5700, 5970, 6270, 6370]) * KM, {1: (5466.875e3, 5970e3)}, ETA_FJ1),
     "T4full": (False, B_FJ2, {1: (5466.875e3, 6150e3)}, ETA_FJ2),
+    # The chunk 4 layout F1 (reduced table, range (5105.625, 5700) km without a density
+    # jump) under the default method: the oracle rows of the default in V2.
+    "F1d": (True, tca.B_F1, tca.MOV_F1, tca.ETA_F1),
     # V10: a cut range that holds the viscosity-only pair of the input at 6270 km and ends
-    # at the surface (motion="cut" explicitly: the range holds no density jump).
+    # at the surface. The cut is the default; the tests pass motion="cut" explicitly
+    # because V10 is a test of the cut on this range.
     "FV": (True, np.array([3480, 5970, 6250, 6370]) * KM, {2: (6150e3, 6370e3)}, np.array([1e22, 3e20, 1e23])),
 }
 
@@ -174,14 +183,16 @@ def input_profile(reduced: bool):
 
 
 @functools.lru_cache(maxsize=None)
-def layers(name: str, motion: str = "auto", r0: float | None = None):
+def layers(name: str, motion: str | None = None, r0: float | None = None):
     """``(Layers, B, eta)`` of a layout; ``r0`` replaces the construction radius of the
-    first movable boundary (C12)."""
+    first movable boundary (C12). ``motion=None`` passes no keyword, so that the layout
+    is built with the package default; a string is passed on as the keyword."""
     reduced, B, movable, eta = LAYOUTS[name]
     B = B.copy()
     if r0 is not None:
         B[min(movable)] = r0
-    return sj.Layers(input_profile(reduced), B, movable=movable, motion=motion), B, eta
+    kw = {} if motion is None else {"motion": motion}
+    return sj.Layers(input_profile(reduced), B, movable=movable, **kw), B, eta
 
 
 def ref_input(name: str) -> rc.RefTable:
@@ -202,9 +213,10 @@ def cut_index(name: str) -> tuple[int, ...]:
 
 
 @functools.lru_cache(maxsize=None)
-def kernel_fn(name: str, form_name: str, lmax: int, motion: str = "auto"):
+def kernel_fn(name: str, form_name: str, lmax: int, motion: str | None = None):
     """A jitted ``x -> input kernels`` of a layout at the movable radii ``x``: one compile
-    per worker, layout, formulation and degree."""
+    per worker, layout, formulation and degree. ``motion`` as in ``layers`` (``None``: the
+    package default)."""
     L, B, eta = layers(name, motion)
     cfg = sj.StokesConfig(lmax=lmax, formulation=FORMS[form_name])
     le = jnp.asarray(np.log(eta))
@@ -279,23 +291,54 @@ def on_node(name: str, x) -> bool:
 # ===========================================================================
 
 
-def test_c1_motion_resolution():
-    """C1: "auto" resolves to "cut" when a range holds a density-jump pair, to "affine"
-    otherwise; ``MovableRange.density_jumps`` lists the pairs inside."""
+def test_c1_motion_default():
+    """C1: the keyword ``motion`` of ``Layers``.
+
+    (a) Without the keyword, the layouts whose ranges hold density-jump pairs are cuts,
+    and ``MovableRange.density_jumps`` lists the pairs inside. (b) Without the keyword,
+    the three chunk 4 layouts whose ranges hold no density jump (F1, F3, F-node) are cuts
+    too: the default does not depend on where the density jumps are. (c) The same three
+    layouts with ``motion="affine"`` run the affine method. (d) Without a movable
+    boundary ``Layers.motion`` is ``None``. (e) A string that is not one of the two
+    methods (the call below passes auto) is refused. (f) F1 without the keyword and F1
+    with ``motion="cut"`` give equal input kernels, bit for bit, between nodes and on a
+    node."""
+    # (a) layouts with density jumps inside a range, default method.
     for name, jumps in (("FJ1", {1: (J,)}), ("FJ2", {1: (J, J2)}), ("FJ3", {1: (J,), 2: (J2,)})):
         L = layers(name)[0]
         assert L.motion == "cut"
         for k, v in jumps.items():
             assert L.ranges[k].motion == "cut" and L.ranges[k].density_jumps == v
     p = input_profile(True)
-    for B, mov in ((tca.B_F1, tca.MOV_F1), (tca.B_F3, tca.MOV_F3),
-                   (np.array([3480, 5286.25, 5700, 5970, 6270, 6370]) * KM,
-                    {1: (5105.625e3, 5700e3), 4: (6189.375e3, 6370e3)})):
+    jump_free = ((tca.B_F1, tca.MOV_F1), (tca.B_F3, tca.MOV_F3),
+                 (np.array([3480, 5286.25, 5700, 5970, 6270, 6370]) * KM,
+                  {1: (5105.625e3, 5700e3), 4: (6189.375e3, 6370e3)}))
+    for B, mov in jump_free:
+        # (b) jump-free ranges, default method: cuts, no static limits.
         L = sj.Layers(p, B, movable=mov)
-        assert L.motion == "affine"
-        assert all(g.motion == "affine" and g.density_jumps == () for g in L.ranges.values())
+        assert L.motion == "cut"
+        assert all(g.motion == "cut" and g.density_jumps == () for g in L.ranges.values())
+        assert L.profile.structure.limits is None and L.profile.structure.cuts
+        # (c) the same ranges with the affine method on request.
+        La = sj.Layers(p, B, movable=mov, motion="affine")
+        assert La.motion == "affine"
+        assert all(g.motion == "affine" and g.density_jumps == () for g in La.ranges.values())
+    # (d) no movable boundary.
     assert sj.Layers(p, tca.B_F1).motion is None
-    assert sj.Layers(p, tca.B_F1, movable=tca.MOV_F1, motion="cut").motion == "cut"
+    # (e) a string that is not one of the two methods.
+    with pytest.raises(ValueError, match="motion must be"):
+        sj.Layers(p, tca.B_F1, movable=tca.MOV_F1, motion="auto")
+    # (f) the default equals the explicit cut, bit for bit, at 5321.7 km (between the
+    # nodes) and on the input node 5286.25 km.
+    Ld = sj.Layers(p, tca.B_F1, movable=tca.MOV_F1)
+    Lc = sj.Layers(p, tca.B_F1, movable=tca.MOV_F1, motion="cut")
+    cfg = sj.StokesConfig(lmax=6)
+    le = np.log(tca.ETA_F1)
+    for x in (5321.7e3, 5286.25e3):
+        Kd = Ld.input_kernels(sj.stokes_kernels(Ld(Ld.full_boundaries(np.array([x])), le), cfg))
+        Kc = Lc.input_kernels(sj.stokes_kernels(Lc(Lc.full_boundaries(np.array([x])), le), cfg))
+        for o in SI_OUTPUTS:
+            assert np.array_equal(np.asarray(getattr(Kd, o)), np.asarray(getattr(Kc, o))), (x, o)
 
 
 @pytest.mark.parametrize("name", ["FJ1", "FJ2", "FJ3", "FJ1x"])
@@ -327,9 +370,9 @@ def test_c2_construction_table(name):
 
 
 def _c3_cases():
-    """(layout, motion) of C3: the cut layouts, and the chunk 4 layouts F1 and F3 with
-    ``motion="cut"`` (ranges without a density jump)."""
-    return [("FJ1", "auto"), ("FJ3", "auto"), ("FJ1x", "auto"), ("F1", "cut"), ("F3", "cut")]
+    """(layout, motion) of C3: the cut layouts with the package default (``None``), and
+    the chunk 4 layouts F1 and F3 with ``motion="cut"`` (ranges without a density jump)."""
+    return [("FJ1", None), ("FJ3", None), ("FJ1x", None), ("F1", "cut"), ("F3", "cut")]
 
 
 def _layers_c3(name, motion):
@@ -398,7 +441,7 @@ def test_c6_refusals():
     p = input_profile(True)
     with pytest.raises(ValueError, match="motion must be"):
         sj.Layers(p, B_FJ1, movable={1: (5466.875e3, 5970e3)}, motion="slide")
-    with pytest.raises(ValueError, match="density jump pair"):
+    with pytest.raises(ValueError, match="density jump pair.*motion='cut'"):
         sj.Layers(p, B_FJ1, movable={1: (5466.875e3, 5970e3)}, motion="affine")
     with pytest.raises(ValueError, match="lies inside the movable range"):
         sj.Layers(p, np.array([3480, 5600, 5750, 5970, 6270, 6370]) * KM, movable={1: (5466.875e3, 5970e3)})
@@ -572,8 +615,8 @@ def test_c11_loop_free():
 def test_c12_construction_radius_independent(form_name):
     """C12: two ``Layers`` of FJ1 with different construction radii (5600 and 5533.3 km)
     give the same kernels at the same position, bit for bit."""
-    La = layers("FJ1", "auto", 5600e3)[0]
-    Lb = layers("FJ1", "auto", 5533.3e3)[0]
+    La = layers("FJ1", None, 5600e3)[0]
+    Lb = layers("FJ1", None, 5533.3e3)[0]
     cfg = sj.StokesConfig(lmax=6, formulation=FORMS[form_name])
     for x in (5612.3e3, J, 5850.703e3):
         Ka = sj.stokes_kernels(La(La.full_boundaries(np.array([x])), np.log(ETA_FJ1)), cfg)
@@ -671,6 +714,10 @@ V2_CASES = [
     ("FJ1", "tala_nsg_uniform", "J-1m", J - 1.0, ("geometric",)),
     ("FJ1", "tala_nsg_uniform", "J+1m", J + 1.0, ("geometric",)),
     ("FJ1", "tala_nsg_uniform", "5711", 5711e3, ("geometric",)),
+    # The default method on the chunk 4 layout F1 (a range without a density jump).
+    ("F1d", "default", "5321.7", 5321.7e3, ("swapped",)),
+    ("F1d", "default", "node", 5286.25e3, ("node_split",)),
+    ("F1d", "tala", "5321.7", 5321.7e3, ()),
 ]
 
 _BUILDERS = {"swapped": rc.swapped_pair_table, "node_split": rc.node_split_table, "pair": rc.pair_table,

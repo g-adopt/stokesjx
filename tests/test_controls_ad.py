@@ -17,6 +17,10 @@ with a movable radius computes the crossings of its table in numpy (``crossing_r
 below, independent of ``Layers.crossings``) and asserts that its base point is farther
 from every crossing than ``CROSSING_CLEARANCE`` times its largest step. T21 sits on the
 crossing ``r0`` on purpose.
+
+Every ``Layers`` with a movable boundary in this file passes ``motion="affine"``, because
+the file tests the derivatives of the affine method. The tests of the default method, the
+viscosity cut, are in ``tests/test_controls_cut.py``.
 """
 
 from __future__ import annotations
@@ -130,11 +134,11 @@ def _p_full():
 
 
 def layers_f1(p=None):
-    return sj.Layers(_p_red() if p is None else p, B_F1, movable=MOV_F1)
+    return sj.Layers(_p_red() if p is None else p, B_F1, movable=MOV_F1, motion="affine")
 
 
 def layers_f3():
-    return sj.Layers(_p_red(), B_F3, movable=MOV_F3)
+    return sj.Layers(_p_red(), B_F3, movable=MOV_F3, motion="affine")
 
 
 def full_layout():
@@ -145,9 +149,10 @@ def full_layout():
     i0 = int(np.flatnonzero(r == 5700e3)[-1])
     sA = 0.5 * (r[np.searchsorted(r, 4665e3) - 1] + r[np.searchsorted(r, 4665e3)])
     sC = 0.5 * (r[i0 + 5] + r[i0 + 6])
-    f1 = sj.Layers(p, B_F1, movable={1: (float(r[70]), 5700e3)})
+    f1 = sj.Layers(p, B_F1, movable={1: (float(r[70]), 5700e3)}, motion="affine")
     f3 = sj.Layers(p, np.array([3480e3, sA, 5370e3, 5700e3, sC, 5970e3, 6270e3, 6370e3]),
-                   movable={1: (float(r[36]), float(r[70])), 2: (float(r[70]), 5700e3), 4: (5700e3, 5970e3)})
+                   movable={1: (float(r[36]), float(r[70])), 2: (float(r[70]), 5700e3), 4: (5700e3, 5970e3)},
+                   motion="affine")
     return p, f1, f3
 
 
@@ -627,7 +632,8 @@ def test_g4_wide_range():
     to the jitted one. The density, the observed field and the weights are arguments of
     the compiled functions."""
     p = _p_red()
-    L = sj.Layers(p, np.array([3480e3, B1_RADIUS, 5700e3, 5970e3, 6370e3]), movable={1: (3480e3, 5700e3)})
+    L = sj.Layers(p, np.array([3480e3, B1_RADIUS, 5700e3, 5970e3, 6370e3]), movable={1: (3480e3, 5700e3)},
+                  motion="affine")
     cfg = sj.StokesConfig(lmax=B1_LMAX)
     le = np.log(B1_ETA)
     r0 = float(L.start_radii[0])
@@ -925,7 +931,7 @@ def node_surface_layout(p):
     r_in = np.asarray(p.radius)
     rn = float(r_in[int(np.argmin(np.abs(r_in - 5290e3)))])
     return sj.Layers(p, np.array([3480e3, rn, 5700e3, 5970e3, 6270e3, 6370e3]),
-                     movable={1: (float(r_in[70]), 5700e3), 4: (6150e3, 6370e3)})
+                     movable={1: (float(r_in[70]), 5700e3), 4: (6150e3, 6370e3)}, motion="affine")
 
 
 def test_g15_node_surface(full_tables):

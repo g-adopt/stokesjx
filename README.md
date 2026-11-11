@@ -20,7 +20,6 @@ complete and tested. This work is open:
 - The benchmark against G-ADOPT is not done.
 - The anelastic liquid approximation (ALA) and a partial-slip boundary are not implemented.
 - The documentation site is not written.
-- `motion="cut"` is not yet the default of `Layers` for every movable range. The default is `"auto"`.
 
 ## Install
 
@@ -128,8 +127,8 @@ Run the fast tier (the quick set without the tests of `tests/heavy_tests.txt`):
 
     python -m pytest -n 8 -m "not slow and not heavy"
 
-Measured on reunion (Mac Studio, 32 CPUs) with `-n 8` on 2026-11-11: the quick set has 934
-tests and takes 110 s, the slow set has 207 tests and takes 280 s, and both sets take 358 s.
+Measured on reunion (Mac Studio, 32 CPUs) with `-n 8` on 2026-11-12: the quick set has 937
+tests and takes 110 s, the slow set has 207 tests and takes 281 s, and both sets take 357 s.
 The limit of the quick set is 300 s.
 
 The tests marked `legacy` need the directory `legacy/` (the CODE-A copy, not tracked).
@@ -194,17 +193,18 @@ When the viscosities on both sides of a movable boundary are equal, the position
 boundary has no effect on the kernels, and the radius derivative is exactly zero. A start
 point or a base point of a test needs a viscosity contrast across every movable boundary.
 
-A movable boundary moves by one of two methods (`motion`). Under `"affine"` the nodes of
-the range follow the boundary. The radius derivative then has small jumps ("kinks") where
-a moved node crosses an input radius. Under `"cut"` no node moves. The boundary is a
-viscosity cut inside one interval, and it can cross the density jumps of the table. Under
-an incompressible formulation the cut has no kinks. The default `"auto"` selects
-`"cut"` when a range holds a density jump and `"affine"` otherwise. For the affine method,
-put the starting radius at or above the middle of its range.
+A movable boundary moves by one of two methods (`motion`). The default for every range
+is `"cut"`. No node moves: the boundary is a viscosity cut inside one interval, and it can
+cross the density jumps of the table. Under an incompressible formulation the cut has no
+kinks. With `motion="affine"` the nodes of the range follow the boundary, and the radius
+derivative has small jumps ("kinks") where a moved node crosses an input radius. For the
+affine method, put the starting radius at or above the middle of its range.
 
-Under TALA the kernels jump when a viscosity cut crosses a density jump. `stokes_kernels`
-then gives a `RuntimeWarning` on every call. Usage rule: under TALA, when the radius is
-sampled with HMC, end the movable range at the density jump.
+The density jumps of `rho0` are phase changes. Under TALA, `rho0 u_r` is therefore
+continuous across a density jump, and `u_r` jumps. Under TALA the kernels jump when a
+viscosity cut crosses a density jump. This is a property of the discrete model.
+`stokes_kernels` then gives a `RuntimeWarning` on every call. Usage rule: under TALA, when
+the radius is sampled with HMC, end the movable range at the density jump.
 
 The density of a field is given on the input table of `Layers` (`Layers.fields`). It
 does not move with a boundary.

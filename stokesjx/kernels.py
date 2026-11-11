@@ -319,7 +319,7 @@ def stokes_kernels(profile: RadialProfile, config: StokesConfig) -> Kernels:
     that the widths keep the plan valid) and raises ``ValueError`` otherwise; a traced
     leaf cannot be checked, so under ``jax.grad`` over ``log eta`` the checks of ``rho0``
     and of the radius still run. A profile of a ``controls.Layers`` with movable
-    boundaries carries static limits in its structure (``NodeStructure.limits``: the
+    boundaries under ``motion="affine"`` carries static limits in its structure (``NodeStructure.limits``: the
     largest interval widths, ``|kappa_h|`` and ``rho0`` over every admissible position of
     the boundaries); the Pade plan is built from these limits, and a configuration whose
     limits exceed ``Numerics.rho0_max`` (FULL) or ``Numerics.kappa_h_max`` (TALA) raises

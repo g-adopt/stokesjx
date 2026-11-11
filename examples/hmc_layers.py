@@ -9,7 +9,7 @@ synthetic problem and are not a recommendation for another problem.
 Command line::
 
     python examples/hmc_layers.py [--lmax 20] [--reduced] [--samples 1000]
-        [--leapfrog 10] [--step 0.5] [--seed 3] [--motion auto|cut|affine]
+        [--leapfrog 10] [--step 0.5] [--seed 3] [--motion cut|affine]
         [--range LO HI] [--start-radius KM] [--true-radius KM] [--noise 0.2]
         [--smoke] [--out PATH]
 
@@ -18,7 +18,7 @@ Options: ``--lmax`` the largest degree; ``--reduced`` the 25-node table in place
 transitions; ``--leapfrog`` the leapfrog steps per trajectory; ``--step`` the leapfrog
 step size in the whitened coordinates (each transition multiplies it by a uniform number
 in [0.8, 1.2]); ``--seed`` the seed of the chain; ``--motion`` the method of the movable
-boundary (``stokesjx.Layers``); ``--range LO HI`` the movable range in km (default
+boundary (``stokesjx.Layers``; default ``cut``, the package default, or ``affine``); ``--range LO HI`` the movable range in km (default
 5466.875 5970, across the 670 km density jump at 5700 km); ``--start-radius`` the
 construction radius of the boundary in km (default 5750, above the middle of the range);
 ``--true-radius`` the radius of the synthetic truth in km (default 5690); ``--noise`` the
@@ -28,7 +28,7 @@ leapfrog steps; the same noise, MAP search and MAP gate); ``--out`` the JSON sum
 (default ``examples/output/hmc_summary.json`` beside this script).
 
 Output: the JSON summary (strict JSON: a non-finite number is written as ``null``),
-with the settings (the resolved ``motion``, the range, the start and the true radius in
+with the settings (the method ``motion``, the range, the start and the true radius in
 km), the MAP record (iterations per stage, the metric norm of the gradient, ``U`` at the
 MAP and at the truth, the condition number of the metric), the samples in the
 coordinates ``z`` and in physical units (Pa s, km), per transition the Metropolis
@@ -52,8 +52,8 @@ deviation ``sigma_l`` = noise times the root mean square coefficient of degree `
 (``np.random.default_rng(11)``). The likelihood is ``spectral_misfit`` with the weights
 ``1 / (2 sigma_l^2)``, the negative Gaussian log-likelihood.
 
-The range holds the 670 km density jump, so ``motion="auto"`` resolves to the viscosity
-cut: the boundary moves freely across the density jump, and under the default
+The boundary is a viscosity cut, the default method of ``stokesjx.Layers``: the range
+holds the 670 km density jump, the boundary moves freely across it, and under the default
 formulation (incompressible) the map from the radius to the geoid is continuously
 differentiable everywhere, so a trajectory that crosses 5700 km pays no energy error for
 the crossing.
@@ -234,7 +234,7 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--leapfrog", type=int, default=10)
     p.add_argument("--step", type=float, default=0.5)
     p.add_argument("--seed", type=int, default=3)
-    p.add_argument("--motion", choices=("auto", "cut", "affine"), default="auto")
+    p.add_argument("--motion", choices=("cut", "affine"), default="cut")
     p.add_argument("--range", type=float, nargs=2, default=(5466.875, 5970.0), metavar=("LO", "HI"),
                    help="movable range of the boundary, km")
     p.add_argument("--start-radius", type=float, default=5750.0, help="construction radius, km")

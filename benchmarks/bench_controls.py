@@ -57,11 +57,11 @@ The viscosity cut (chunk c4b, NOTES/chunks/c4b-boundaries-across-jumps/01-plan.m
 
 - at S1 and S2, interleaved with the programs above: ``layers_cut``, ``layers_cut_field`` and
   ``layers_cut_vmap4``, the same functionals with ``Layers(..., motion="cut")`` on the same
-  range (the chunk 4 programs keep ``motion="auto"``, which is the affine motion there);
+  range (the chunk 4 programs pass ``motion="affine"``, see ``make_layers``);
 - SJ: the full ``t_prem()`` table (137 nodes, density pairs at 5700, 5970 and 6150 km) with
   the boundaries 3480, 5700, 5970, 6270, 6370 km and the 5700 km boundary movable in
-  (5466.875, 5970) km, so that the range holds the 670 km density jump and ``"auto"`` is
-  the cut; hager4 viscosities, ``lmax = 50``; SJ100: the same at ``lmax = 100``. Programs
+  (5466.875, 5970) km, so that the range holds the 670 km density jump, built with the
+  default method of ``Layers`` (the cut); hager4 viscosities, ``lmax = 50``; SJ100: the same at ``lmax = 100``. Programs
   ``direct`` (``value_and_grad`` with respect to ``log eta`` per node, ``rho0``, the radius
   and ``cut_radius`` of the construction profile), ``layers``, ``layers_field`` and
   ``layers_vmap4``;
@@ -132,18 +132,23 @@ PROGRAMS = ("direct", "direct_construction", "layers", "layers_field", "layers_v
 COMPILED = ("layers", "layers_field", "layers_vmap4", "direct")
 
 
-def make_layers(size: str, two: bool = False, motion: str = "auto"):
-    """``(Layers, cfg)`` of a size; ``two`` gives the two-boundary layering of ``layers_two``;
-    ``motion`` is the ``Layers`` keyword (``"auto"`` is the affine motion at S1 and S2 and the
-    cut at SJ and SJ100)."""
+def make_layers(size: str, two: bool = False, motion: str | None = None):
+    """``(Layers, cfg)`` of a size; ``two`` gives the two-boundary layering of ``layers_two``.
+
+    ``motion`` is the ``Layers`` keyword. ``None`` selects the method of the records of
+    this script: ``"affine"`` at S1 and S2 (the chunk 4 programs measure the affine
+    method) and no keyword, so the package default (the cut), at SJ and SJ100."""
     make, lmax = SIZES[size]
     p = make()
+    if motion is None and size in ("S1", "S2"):
+        motion = "affine"
+    kw = {} if motion is None else {"motion": motion}
     if two:
         r = np.asarray(p.radius)
         mid = float(r[np.argmin(np.abs(r - 5850.703e3))])
-        L = sj.Layers(p, BOUNDARIES, movable={1: (5466.875e3, mid), 2: (mid, 6189.375e3)}, motion=motion)
+        L = sj.Layers(p, BOUNDARIES, movable={1: (5466.875e3, mid), 2: (mid, 6189.375e3)}, **kw)
     else:
-        L = sj.Layers(p, BOUNDARIES, movable=MOVABLE, motion=motion)
+        L = sj.Layers(p, BOUNDARIES, movable=MOVABLE, **kw)
     return L, sj.StokesConfig(lmax=lmax)
 
 
@@ -154,10 +159,12 @@ def kernel_scales(size: str) -> list[float]:
     return [float(np.max(np.abs(np.asarray(getattr(K, o))))) for o in OUTS]
 
 
-def functions(size: str, scales, two: bool = False, motion: str = "auto") -> dict:
+def functions(size: str, scales, two: bool = False, motion: str | None = None) -> dict:
     """``name -> (function, args, forward)``: the programs of the benchmark. ``function`` is
     the gradient program, ``forward`` its value alone (for the compile protocol). For a cut
-    layering ``direct`` also differentiates ``cut_radius`` of the construction profile."""
+    layering ``direct`` also differentiates ``cut_radius`` of the construction profile.
+    ``motion`` as in ``make_layers`` (``None``: affine at S1 and S2, the default at SJ and
+    SJ100)."""
     L, cfg = make_layers(size, two, motion)
     lmax = cfg.lmax
     n_deg = lmax                                  # degrees 1..lmax (CM frame)
