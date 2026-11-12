@@ -171,9 +171,16 @@ def smooth_eta_rel(radius: str) -> str:
     upper-node rule of CODE-A is tested at every interval. The value is a float64
     written with repr, so the Fortran and the oracle read the same decimal.
     """
+    return repr(10.0 ** (smooth_log10_eta(radius) - 19.0))
+
+
+def smooth_log10_eta(radius: str) -> float:
+    """``log10(eta / Pa s)`` of the smooth profile at a node, the exponent that
+    ``smooth_eta_rel`` raises 10 to (after subtracting 19). It lies between 18.8 and
+    22.7, so one unit in its last place is 3.6e-15, and test_golden.py sizes the
+    platform tolerance of the profile from that unit."""
     d = float(_depth_km(radius))
-    log10_eta = 19.5 + 2.5 * d / 2890.0 + 0.7 * math.tanh((d - 670.0) / 100.0)
-    return repr(10.0 ** (log10_eta - 19.0))
+    return 19.5 + 2.5 * d / 2890.0 + 0.7 * math.tanh((d - 670.0) / 100.0)
 
 
 # The smooth profile at the 129 LEBEDEV nodes, as written for the Fortran golden runs.

@@ -119,21 +119,38 @@ def test_synthetic_basis_matches_formula():
         assert abs(t - f) <= SYNTH_BASIS_ULP * np.spacing(abs(f)), (j, t, f)
 
 
-# Largest distance, in ulp of the formula value, between a stored smooth-profile value
-# and the formula on the running platform. The formula is 10 ** (a + 0.7 tanh(x)): one
-# ulp in tanh moves the exponent by about 0.7 ulp of 1 and the power turns an exponent
-# error e into a relative error ln(10) e, so a few ulp separate two maths libraries.
-# 8 ulp is far below any change of the profile itself.
-SMOOTH_PROFILE_ULP = 8
+# Platform tolerance of the smooth profile eta_rel = 10 ** (E - 19), with the exponent
+# E = log10(eta / Pa s) = 19.5 + 2.5 d / 2890 + 0.7 tanh((d - 670) / 100) between 18.8
+# and 22.7. Two maths libraries can differ by one ulp in tanh. That moves E by at most
+# 0.8e-16 before rounding, and E then rounds to its own float or to the neighbour, so E
+# can differ by one ulp of E (3.6e-15, not the 1.1e-16 of a number near 1). The power
+# turns an exponent error e into a relative error ln(10) e, here 8.2e-15, and adds at
+# most one ulp of its own result. Measured on the Linux x86-64 CI runner (2026-11-12):
+# 1.9e-14 at node 104 (eta_rel 2.34), which is one ulp of E and 43 ulp of the value.
+# The bound allows two ulp of E and two ulp of the result. It is still far below any
+# change of the profile itself (a change of 1e-6 in any constant of the formula moves
+# eta_rel by at least 1e-9 relative at some node).
+SMOOTH_EXPONENT_ULP = 2
+SMOOTH_RESULT_ULP = 2
+
+
+def smooth_profile_bound(log10_eta: float, value: float) -> float:
+    """Largest platform difference allowed for one smooth-profile value (see the
+    comment above): ``SMOOTH_EXPONENT_ULP`` ulp of the exponent, turned into a
+    relative error by the power, plus ``SMOOTH_RESULT_ULP`` ulp of the value."""
+    return (SMOOTH_EXPONENT_ULP * math.log(10.0) * np.spacing(abs(log10_eta)) * abs(value)
+            + SMOOTH_RESULT_ULP * np.spacing(abs(value)))
 
 
 def test_smooth_profile_matches_formula():
     """The stored smooth golden profile (cases.SMOOTH_ETA_REL_LEBEDEV) is the formula
-    of cases.smooth_eta_rel to within SMOOTH_PROFILE_ULP on this platform."""
+    of cases.smooth_eta_rel to within the platform bound ``smooth_profile_bound`` on
+    this platform."""
     for j, r in enumerate(cases.LEBEDEV_RADIUS):
         t = float(cases.SMOOTH_ETA_REL_LEBEDEV[j])
         f = float(cases.smooth_eta_rel(r))
-        assert abs(t - f) <= SMOOTH_PROFILE_ULP * np.spacing(abs(f)), (j, t, f)
+        bound = smooth_profile_bound(cases.smooth_log10_eta(r), f)
+        assert abs(t - f) <= bound, (j, t, f, bound)
 
 
 def _sqt():
