@@ -119,6 +119,23 @@ def test_synthetic_basis_matches_formula():
         assert abs(t - f) <= SYNTH_BASIS_ULP * np.spacing(abs(f)), (j, t, f)
 
 
+# Largest distance, in ulp of the formula value, between a stored smooth-profile value
+# and the formula on the running platform. The formula is 10 ** (a + 0.7 tanh(x)): one
+# ulp in tanh moves the exponent by about 0.7 ulp of 1 and the power turns an exponent
+# error e into a relative error ln(10) e, so a few ulp separate two maths libraries.
+# 8 ulp is far below any change of the profile itself.
+SMOOTH_PROFILE_ULP = 8
+
+
+def test_smooth_profile_matches_formula():
+    """The stored smooth golden profile (cases.SMOOTH_ETA_REL_LEBEDEV) is the formula
+    of cases.smooth_eta_rel to within SMOOTH_PROFILE_ULP on this platform."""
+    for j, r in enumerate(cases.LEBEDEV_RADIUS):
+        t = float(cases.SMOOTH_ETA_REL_LEBEDEV[j])
+        f = float(cases.smooth_eta_rel(r))
+        assert abs(t - f) <= SMOOTH_PROFILE_ULP * np.spacing(abs(f)), (j, t, f)
+
+
 def _sqt():
     """CODE-A's sqrt(4 pi) with the float32 pi, evaluated in double (constants.h:14)."""
     return float(np.sqrt(4.0 * np.float64(np.float32(math.pi))))

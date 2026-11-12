@@ -120,7 +120,7 @@ Run every test:
 The markers select tests by hand: `-m slow` (the tests above about 30 s), `-m "not slow"`,
 `-m "not heavy"` (without the tests of `tests/heavy_tests.txt`) and `-m "not legacy"`.
 
-Measured on reunion (Mac Studio, 32 CPUs) with `-n 8` on 2026-11-12: 1102 tests pass in
+Measured on reunion (Mac Studio, 32 CPUs) with `-n 8` on 2026-11-12: 1103 tests pass in
 327 s.
 
 The tests that need the directory `legacy/` (the CODE-A copy, not tracked) skip without

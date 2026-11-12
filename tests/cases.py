@@ -176,14 +176,33 @@ def smooth_eta_rel(radius: str) -> str:
     return repr(10.0 ** (log10_eta - 19.0))
 
 
+# The smooth profile at the 129 LEBEDEV nodes, as written for the Fortran golden runs.
+#
+# smooth_eta_rel uses math.tanh and the power 10.0 ** x, whose last bit comes from the
+# C maths library of the platform (macOS and glibc differ for some arguments). The
+# golden runs read the repr of these values, and test_golden.py checks the sha256 of
+# the viscosity file text against the manifest, so the golden runs take the stored
+# strings (reunion, macOS arm64, 2026-11-11) and the text is the same on every
+# platform. Other node tables (T_smooth(N)) still use the formula, because only
+# tolerance tests read them. test_smooth_profile_matches_formula checks the stored
+# values against the formula to a few ulp on the running platform.
+SMOOTH_ETA_REL_PATH = Path(__file__).parent / "data" / "smooth_eta_rel_lebedev.txt"
+SMOOTH_ETA_REL_LEBEDEV = tuple(
+    line.strip() for line in SMOOTH_ETA_REL_PATH.read_text().splitlines()
+    if line.strip() and not line.startswith("#"))
+assert len(SMOOTH_ETA_REL_LEBEDEV) == 129
+
+
 def golden_eta_rel(profile: str) -> tuple[str, ...]:
-    """eta_rel at the 129 LEBEDEV nodes for a golden-run profile, CMB first."""
+    """eta_rel at the 129 LEBEDEV nodes for a golden-run profile, CMB first. The
+    smooth profile comes from the stored strings ``SMOOTH_ETA_REL_LEBEDEV`` (see the
+    comment above them)."""
     if profile == "iso":
         return tuple(ISO_ETA_REL for _ in LEBEDEV_RADIUS)
     if profile == "hager4":
         return tuple(layered_eta_rel(r, HAGER4_LAYERS) for r in LEBEDEV_RADIUS)
     if profile == "smooth":
-        return tuple(smooth_eta_rel(r) for r in LEBEDEV_RADIUS)
+        return SMOOTH_ETA_REL_LEBEDEV
     raise ValueError(profile)
 
 
