@@ -71,8 +71,15 @@ jobs:
       - name: check the skipped tests
         if: always()
         run: python .github/check_skips.py artifacts/pytest.xml --expected 25
+      # The JUnit report is for reading a failure, so it is uploaded only when a
+      # step failed, and kept for 7 days. The artifact storage of the organisation
+      # is shared by every repository and can be full; the upload must then not
+      # turn a run whose tests passed into a failed run, so the step may fail
+      # without failing the job.
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: failure()
+        continue-on-error: true
         with:
           name: pytest
           path: artifacts/
+          retention-days: 7
