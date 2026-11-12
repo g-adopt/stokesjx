@@ -40,6 +40,16 @@ jobs:
     # runner host needs nothing installed apart from Docker. The `Linux` label
     # keeps the job off the macOS runner of the organisation.
     container: python:3.12-bookworm
+    # The repository is public and the runners are machines of the
+    # organisation. A pull request from a fork carries code that nobody in
+    # the organisation has reviewed, and this job would run that code on
+    # those machines. So the job runs for a push to main, for a manual run,
+    # and for a pull request whose branch is in this repository; a pull
+    # request from a fork gets no job here. A maintainer can push the
+    # branch of such a pull request to this repository to test it.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
