@@ -12,6 +12,8 @@ viscosity jumps. The derivatives are for Hamiltonian Monte Carlo (HMC) over the 
 viscosity. The package supplies values and derivatives only. It does not choose a
 sampler or a prior.
 
+Documentation: <https://gadopt.org/stokesjx/>
+
 ## Status
 
 The solver, the physics flags, the fields, the control maps and the derivatives are
@@ -19,7 +21,7 @@ complete and tested. This work is open:
 
 - The benchmark against G-ADOPT is not done.
 - The anelastic liquid approximation (ALA) and a partial-slip boundary are not implemented.
-- The documentation site is not written.
+- The comparisons against published values are not done.
 
 ## Install
 
@@ -111,28 +113,19 @@ benchmark.
 
 ## Test
 
-Run the quick set (every test without the `slow` marker):
+Run every test:
 
     python -m pytest -n 8
 
-Run the slow set:
+The markers select tests by hand: `-m slow` (the tests above about 30 s), `-m "not slow"`,
+`-m "not heavy"` (without the tests of `tests/heavy_tests.txt`) and `-m "not legacy"`.
 
-    python -m pytest -n 8 -m slow
+Measured on reunion (Mac Studio, 32 CPUs) with `-n 8` on 2026-11-12: 1101 tests pass in
+339 s (1-minute load average 6.0 at the start and 10.0 at the end).
 
-Run both sets:
-
-    python -m pytest -n 8 -m ""
-
-Run the fast tier (the quick set without the tests of `tests/heavy_tests.txt`):
-
-    python -m pytest -n 8 -m "not slow and not heavy"
-
-Measured on reunion (Mac Studio, 32 CPUs) with `-n 8` on 2026-11-12: the quick set has 937
-tests and takes 110 s, the slow set has 207 tests and takes 281 s, and both sets take 357 s.
-The limit of the quick set is 300 s.
-
-The tests marked `legacy` need the directory `legacy/` (the CODE-A copy, not tracked).
-Without it, these tests skip.
+The tests that need the directory `legacy/` (the CODE-A copy, not tracked) skip without
+it. The 13 tests that compare with lovejx skip when lovejx is not installed (it is not on
+PyPI). CI runs every test that needs neither `legacy/` nor lovejx, and skips 25 tests.
 
 ## Validation
 
@@ -165,7 +158,6 @@ stokesjx fixes these errors and hacks of CODE-A:
 
 ## Performance
 
-<!-- bench_integration table -->
 | size | nodes | lmax | Pade order/squarings | forward ms | fields ms | gradient ms | gradient_all ms | vmap4 / gradient | compile forward s | compile gradient s | RSS gradient GB | RSS vmap4 GB |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | P50 | 137 | 50 | 9/0 | 8.5 | 8.6 | 28.4 | 28.6 | 2.94 | 0.36 | 0.89 | 0.70 | 1.27 |
@@ -173,8 +165,7 @@ stokesjx fixes these errors and hacks of CODE-A:
 | P200 | 521 | 200 | 9/0 | 100.3 | 107.1 | 301.3 | 306.3 | 4.52 | 0.31 | 0.85 | 4.04 | 12.68 |
 | P200c | 137 | 200 | 9/2 | 35.6 | 37.5 | 112.4 | 114.3 | 3.30 | 0.31 | 0.86 | 1.82 | 5.30 |
 
-Measured 2026-11-11T23:26:46 on reunion (arm64), JAX 0.11.1, `benchmarks/bench_integration.py`; 1-minute load average 6.5 to 17.6. Run time: median of the calls of all rounds. Compile: protocol "first", median of three fresh processes. RSS: peak resident set of a fresh process that compiles and runs the program once.
-<!-- end table -->
+Measured 2026-11-11T23:26:46 on reunion (arm64), JAX 0.11.1, with the timing script of the working notes (not in the repository); 1-minute load average 6.5 to 17.6. Run time: median of the calls of all rounds. Compile: protocol "first", median of three fresh processes. RSS: peak resident set of a fresh process that compiles and runs the program once.
 
 ## Notes for samplers
 
@@ -189,9 +180,11 @@ inside each range end. Outside these bounds the radius derivative is zero. The p
 a radius must have its support inside these bounds. The HMC example samples the radius
 through a logistic map onto the bounds.
 
-When the viscosities on both sides of a movable boundary are equal, the position of the
-boundary has no effect on the kernels, and the radius derivative is exactly zero. A start
-point or a base point of a test needs a viscosity contrast across every movable boundary.
+Under `motion="cut"`, when the viscosities on both sides of a movable boundary are equal,
+the position of the boundary has no effect on the kernels, and the radius derivative is
+exactly zero. Under `motion="affine"` the derivative is small but not zero, because the
+moved nodes change the density table. A start point or a base point of a test needs a
+viscosity contrast across every movable boundary.
 
 A movable boundary moves by one of two methods (`motion`). The default for every range
 is `"cut"`. No node moves: the boundary is a viscosity cut inside one interval, and it can
@@ -241,6 +234,12 @@ scales, the spherical-harmonic conventions and the Taylor-test policy are ported
 lovejx. CODE-A uses the quad-precision LINPACK routines of John Burkardt. See the file
 `NOTICE`.
 
+## Agentic coding
+
+Agentic coding tools wrote this software under the direction and review of the author.
+[The documentation](https://gadopt.org/stokesjx/agentic-coding.html) states what the
+tools wrote, what the author decided, and which checks the result must pass.
+
 ## Layout
 
 - `stokesjx/`: the package.
@@ -258,7 +257,8 @@ lovejx. CODE-A uses the quad-precision LINPACK routines of John Burkardt. See th
   - `sh.py`: the spherical-harmonic conventions and the grid synthesis.
   - `io/legacy.py`: the file formats of CODE-A.
 - `examples/`: the three examples and the node table of the examples.
-- `benchmarks/`: the timing and kink scripts.
+- `docs/`: the Quarto documentation site (`make docs`).
+- `.github/`: the CI and documentation workflows.
 - `tests/`: the test suite, with the golden reference data in `tests/golden/`.
 
 The directories `NOTES/` (working notes) and `legacy/` (the CODE-A copy) are not tracked.

@@ -1,0 +1,159 @@
+---
+title: "Derivatives"
+---
+
+## What is differentiable
+
+`stokes_kernels` and the field functions are pure JAX functions. `jax.grad`, `jax.jvp`,
+`jax.vmap` and `jax.jit` apply to them with respect to:
+
+- the layer viscosities (through `Layers` or `viscosity_by_node`), or `eta` of the
+  profile directly;
+- the radii of movable viscosity boundaries (through `Layers`);
+- every other leaf of a `RadialProfile`: `rho0`, the radius, the core density, the core
+  mass and the scalar densities.
+
+The static parts (the node structure, the flags and the degree range) are not
+differentiable. They are the key of the compiled program.
+
+## Layers and ControlVector
+
+`Layers(table, boundaries, movable={k: (lo, hi)})` fixes the structure of the node table
+once. The instance is a pure function `layers(boundaries, log_eta)` that returns a
+profile: one natural-log viscosity per layer, and the radii of the movable boundaries.
+The ends of a movable range must be node radii of the table. `ControlVector` turns a
+pytree of controls into one vector with a jitted value and gradient.
+
+```python
+import numpy as np
+import jax.numpy as jnp
+import stokesjx as sj
+
+radius = np.linspace(3480e3, 6370e3, 129)                   # m, CMB first
+rho0 = np.linspace(5500.0, 3300.0, 129)                     # kg/m^3
+eta = np.where(radius > 5700e3, 1e21, 1e22)                 # Pa s
+table = sj.RadialProfile(radius, rho0, eta, core_density=9900.0)
+
+boundaries = np.array([3480e3, 5750e3, 5970e3, 6270e3, 6370e3])
+layers = sj.Layers(table, boundaries, movable={1: (5466.875e3, 5970e3)})
+cfg = sj.StokesConfig(lmax=20)
+weights = np.where(np.arange(21) >= 2, 1.0, 0.0)
+
+def misfit(c, density, observed):
+    prof = layers(layers.full_boundaries(c["radius"]), c["log_eta"])
+    N = layers.fields(sj.stokes_kernels(prof, cfg), density).geoid
+    return sj.spectral_misfit(N, observed, weights, "real_4pi")
+
+density = np.zeros((129, 2, 21, 21))                        # kg/m^3, on the input table
+density[:, 0, 2, 0] = 10.0
+log_eta = np.log([1e22, 1e21, 1e21, 1e21])
+cv = sj.ControlVector({"radius": layers.start_radii, "log_eta": log_eta})
+x0 = cv.ravel({"radius": jnp.asarray(layers.start_radii), "log_eta": jnp.asarray(log_eta)})
+value, gradient = cv.value_and_grad(misfit)(x0, density, np.zeros((2, 21, 21)))
+assert np.all(np.isfinite(np.asarray(gradient))) and float(gradient[-1]) != 0.0
+```
+
+The density of `layers.fields` is given on the input table. It does not move when a
+boundary moves. Pass the density and the observed field to the jitted function as
+arguments: a closed-over array is a constant of the program and costs compile time.
+
+## Movable boundaries
+
+A movable boundary moves by one of two methods, selected with the keyword `motion`:
+
+- `motion="cut"`, the default of `Layers` for every range. No node moves. The boundary is a
+  viscosity cut inside one interval of the fixed node table, and the solver splits that
+  interval into two exact sub-steps ([physics, section 19](physics.qmd#the-viscosity-cut)).
+  The range can hold the density jumps of the table.
+- `motion="affine"`. The nodes of the range follow the boundary by two affine maps, and
+  the reference density of a moved node is read from the input table at its new radius.
+  The radius derivative has small jumps ("kinks") where a moved node crosses an input
+  radius. With this method, put the starting radius at or above the middle of its range.
+  A range must not hold a density jump.
+
+`Layers` clamps a traced movable radius to `Layers.radius_bounds`, 0.1 % of the range
+width inside each range end. Outside these bounds the radius derivative is zero.
+
+Under `motion="cut"`, when the viscosities on both sides of a movable boundary are equal,
+the position of the boundary has no effect on the kernels, and the radius derivative is
+exactly zero. Under `motion="affine"` the derivative is small but not zero, because the
+moved nodes change the density table.
+
+```python
+affine = sj.Layers(table, boundaries, movable={1: (5466.875e3, 5970e3)}, motion="affine")
+lo, hi = affine.radius_bounds[0]                            # m, the clamp range
+assert 5466.875e3 < lo < hi < 5970e3
+assert affine.motion == "affine" and layers.motion == "cut"
+```
+
+## Measured kinks
+
+$E_{rms}$ estimates the leapfrog energy error that the kinks within $1.5\,\sigma_r$ of the
+true radius add to one HMC step of $\sigma_r$. The likelihood is a Gaussian geoid
+likelihood whose posterior standard deviation of the radius is $\sigma_r$. Under an
+incompressible formulation:
+
+| Method | Smooth and LEBEDEV anomaly | Rough anomaly |
+|---|---|---|
+| cut (default) | at most 1.2e-11 nat | 7.6e-11 nat |
+| affine | 0.103 nat (smooth, 137-node PREM table, `lmax = 50`) and 0.137 nat (LEBEDEV, refined 257-node table, `lmax = 100`) | |
+| affine, start above the middle of the range | 0.059 and 0.125 nat | |
+
+## Taylor tests
+
+Every derivative of the package passes a Taylor test with this policy:
+
+- the step ladder $\epsilon_k = 10^{-2}\cdot 2^{-k}$, $k = 0..7$;
+- a window of four rungs;
+- both signs of the direction, and both modes (forward and reverse);
+- the corrected remainder converges with a rate of at least 1.9, and the uncorrected
+  remainder with a rate in the band (0.8, 1.2);
+- a negative control: the same measurement with the derivative multiplied by 1.01 must
+  fail;
+- a measurement that the rounding hides is "unresolved", which is not a pass.
+
+The jvp/vjp dot products $\langle \mathbf{dy}, J\,\mathbf{dx}\rangle = \langle J^T\mathbf{dy}, \mathbf{dx}\rangle$
+agree to `1e-12` relative. One case has a looser bound: on a thin stiff lid (1e27 Pa s
+on a 1e20 Pa s mantle) the dot product agrees to `1e-10`.
+
+## The limits under TALA
+
+Under TALA the density jumps of $\rho_0$ are phase changes, and $\rho_0 u_r$ is continuous
+across them. Two properties of the discrete model follow:
+
+- **A value jump.** The kernels jump when a viscosity cut crosses a density pair: 0.5 to
+  2.5 % of the geoid field at viscosity contrasts 3 to 100 across the boundary. For an HMC
+  over the radius, one crossing of a trajectory costs 1.0 to 1.5 nat at $\sigma_r = 10$ km
+  for 1e22 | 1e21 Pa s. `stokes_kernels` gives a `RuntimeWarning` on every call when a
+  density pair lies inside a cut range under TALA. Usage rule: under TALA, when the radius
+  is sampled with HMC, end the movable range at the density pair.
+- **Kinks at the input nodes.** Under TALA the cut has small kinks at the input nodes,
+  also on a range without a density jump. On the range (5700, 5970) km of the 137-node
+  PREM table at `lmax = 50`, $E_{rms}$ is 0.036 nat at a viscosity contrast of 10 and
+  0.061 nat at a contrast of 1.1.
+
+## Notes for samplers
+
+- The geoid and the topographies do not change when all viscosities are multiplied by
+  one factor. The data therefore constrain only the ratios of the viscosities. A sampler
+  over all layer viscosities needs a prior on the mean log viscosity or a fixed layer.
+- The prior of a radius must have its support inside `Layers.radius_bounds`.
+- The posterior of the HMC example has a second mode. There the boundary is 10 to 30 km
+  below the 400 km boundary, and the misfit is larger than at the mode of the truth
+  (`U` = 331 against 228.6 at the noise level 0.2). A search from the isoviscous model finds the
+  second mode. The example therefore uses a continuation in the likelihood weights.
+- The HMC script is an example only. The inversion that the package serves is joint with
+  lovejx.
+
+## Cost
+
+Measured on a Mac Studio (arm64), JAX 0.11.1. Run time: the median of the calls of all
+rounds. Compile: the median of three fresh processes. RSS: the peak resident set of a
+fresh process that compiles and runs the program once.
+
+| size | nodes | lmax | Pade order/squarings | forward ms | fields ms | gradient ms | gradient_all ms | vmap4 / gradient | compile forward s | compile gradient s | RSS gradient GB | RSS vmap4 GB |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| P50 | 137 | 50 | 9/0 | 8.5 | 8.6 | 28.4 | 28.6 | 2.94 | 0.36 | 0.89 | 0.70 | 1.27 |
+| P100 | 265 | 100 | 9/0 | 30.4 | 31.3 | 94.7 | 95.5 | 3.28 | 0.33 | 0.89 | 1.35 | 3.58 |
+| P200 | 521 | 200 | 9/0 | 100.3 | 107.1 | 301.3 | 306.3 | 4.52 | 0.31 | 0.85 | 4.04 | 12.68 |
+| P200c | 137 | 200 | 9/2 | 35.6 | 37.5 | 112.4 | 114.3 | 3.30 | 0.31 | 0.86 | 1.82 | 5.30 |

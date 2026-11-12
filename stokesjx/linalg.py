@@ -1,11 +1,12 @@
 """Small batched linear algebra for the propagator solver.
 
-The primitives measured in ``benchmarks/candidates.py``, as package code: the Pade
-pair of the interval exponentials with its static plan, the elimination solver of the
-Pade denominators with its derivative rule, the three-column Gram-Schmidt of the
-sweeps with its triangular factor, the right triangular solve of the carried output
-rows, and the batched 6x6 node solve. ``system.py`` and ``propagate.py`` both use
-them, and ``tests/test_linalg.py`` tests them on their own.
+The batched primitives of the solver: the Pade pair of the interval exponentials with
+its static plan, the elimination solver of the Pade denominators with its derivative
+rule, the three-column Gram-Schmidt of the sweeps with its triangular factor, the right
+triangular solve of the carried output rows, and the batched 6x6 node solve.
+``system.py`` and ``propagate.py`` both use them, and ``tests/test_linalg.py`` tests
+them on their own. The measurements that selected them are in
+NOTES/benchmarks/scripts/candidates.py and NOTES/benchmarks/scripts/bench_primitives.py.
 
 Layouts. The exponential stage works on batch-last arrays ``(6, 6, *batch)`` (matrix
 axes first): a 6x6 product is then one broadcast multiply and one sum over the batch,
@@ -385,9 +386,13 @@ def gram_schmidt3(Z):
     columns, so that XLA fuses it into the scan body. For column ``k``:
     ``s = Q^T v``, ``v' = v - Q s``, ``t = Q^T v'``, ``v'' = v' - Q t``,
     ``R[:k, k] = s + t``, ``R[k, k] = ||v''||``. One re-orthogonalisation gives
-    orthogonality to working precision for a condition number of the columns up to
-    about ``1 / sqrt(eps)`` (Giraud, Langou and Rozloznik 2005), which the sweeps never
-    approach: they re-orthonormalise after every interval. CGS2 was measured 3 x
+    orthogonality to working precision, ``||I - Q^T Q|| <= c u`` with the unit roundoff
+    ``u``, for columns of numerical full rank, ``c' u kappa(Z) < 1`` (Giraud, Langou,
+    Rozloznik and van den Eshof 2005, Numer. Math. 101, 87-100, Theorem 2; ``c`` and
+    ``c'`` are low-degree polynomials in the matrix dimensions). Without the
+    re-orthogonalisation the loss of orthogonality grows with ``kappa(Z)^2`` (their
+    Theorem 1). The sweeps never come near the rank limit: they re-orthonormalise after
+    every interval. CGS2 was measured 3 x
     faster than LAPACK QR inside the scan (CONVENTIONS 14), and, with the largest node
     viscosity as the viscosity scale, as accurate (NOTES/chunks/c2-forward-core/01-plan.md, D1).
     """
@@ -510,7 +515,7 @@ def solve_nodes(M, b, method: str):
         batch-last arrays with the derivative rule ``dX = A^-1 (dB - dA X)``. Through
         the whole solver the elimination is 5 to 7 % faster in the forward map and
         equal or slower in the gradients, and its gradient compiles in about 1.0 s
-        against 0.74 s (129 nodes, ``lmax = 50``; ``benchmarks/bench_forward.py``,
+        against 0.74 s (129 nodes, ``lmax = 50``; ``NOTES/benchmarks/scripts/bench_forward.py``,
         NOTES/benchmarks.md), so ``Numerics`` defaults to ``"lapack"``.
 
     Returns

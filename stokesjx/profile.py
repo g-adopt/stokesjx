@@ -60,9 +60,14 @@ class NodeLimits:
     one side of its pair and changes ``rho0`` at the moved nodes, so the plan must be
     built from the largest values that any admissible position of the boundaries
     gives. ``Layers`` computes them on the host when it is built, from the clamp bounds
-    and the crossing positions of every range (NOTES/chunks/c4-controls-derivatives/01-plan.md D3).
+    and the crossing positions of every range (NOTES/chunks/c4-controls-derivatives/01-plan.md
+    D3).
 
-    Attributes
+    The limits cover the motion of the nodes only. A traced ``rho0`` control (the
+    ``rho0`` keyword of ``Layers``) can leave them, as every traced leaf can leave
+    the static limits of ``Numerics``; the caller's prior must keep it inside.
+
+    Parameters
     ----------
     width
         ``(N - 1,)`` upper limit of each interval width in ``ln r`` over every
@@ -76,10 +81,6 @@ class NodeLimits:
     rho0_max
         Largest ``rho0`` in kg/m^3 that any admissible position gives. ``static_plan``
         refuses it above ``Numerics.rho0_max`` under FULL self-gravitation.
-
-    The limits cover the motion of the nodes only. A traced ``rho0`` control (the
-    ``rho0`` keyword of ``Layers``) can leave them, as every traced leaf can leave
-    the static limits of ``Numerics``; the caller's prior must keep it inside.
     """
 
     width: tuple[float, ...]
@@ -91,7 +92,10 @@ class NodeLimits:
 class NodeStructure:
     """Static, hashable node structure of a profile, read on the host.
 
-    Attributes
+    ``RadialProfile`` builds it from a concrete radius (``from_radius``); a control map
+    passes it explicitly, so that the radius can be traced.
+
+    Parameters
     ----------
     radius
         Construction radii in m, CMB first, as Python floats. They set the static
@@ -126,6 +130,25 @@ class NodeStructure:
         an end node), and the first and the last interval of a range are not jump pairs
         (the bracket of a cut outside its range is clipped to these two intervals, so
         they must have a nonzero width).
+
+    Attributes
+    ----------
+    cut_lo
+        ``(C,)`` int numpy: the lower range node ``lo`` of every viscosity cut.
+    cut_hi
+        ``(C,)`` int numpy: the upper range node ``hi`` of every viscosity cut.
+    cut_mask
+        ``(C, N)`` bool numpy: ``True`` where node ``n`` lies in the range of cut ``q``.
+    n_nodes
+        Number of nodes ``N``, both nodes of every pair included.
+    n_intervals
+        Number of intervals ``N - 1``, the zero-width intervals of the pairs included.
+    width_bounds
+        ``(N - 1,)`` float64 numpy: the static upper limit of the interval width in
+        ``ln r`` per interval (the construction width, zero at a pair; with ``limits``
+        the elementwise maximum of the construction widths and ``limits.width``).
+    interval_mask
+        ``(N - 1,)`` float64 numpy: 0.0 at a pair, 1.0 elsewhere.
     """
 
     radius: tuple[float, ...]
@@ -220,12 +243,27 @@ class NodeStructure:
 
     @classmethod
     def from_radius(cls, radius, *, consistent_core: bool, cuts=()) -> "NodeStructure":
-        """Structure of a concrete radius array (m, CMB first), with the viscosity cuts
-        ``cuts`` (``((lo, hi), ...)`` node indices of the cut ranges; default none).
+        """Structure of a concrete radius array, with the viscosity cuts ``cuts``.
 
-        Raises ``ValueError`` for fewer than two nodes, a radius that decreases, a
-        non-positive or non-finite radius, three equal neighbouring radii (a pair
-        is two nodes), or cuts that ``__post_init__`` refuses."""
+        Parameters
+        ----------
+        radius
+            ``(N,)`` concrete node radii in m, CMB first, non-decreasing. Two equal
+            neighbouring radii are a jump pair.
+        consistent_core
+            True when the core mass is the consistent value (``core_mass=None`` of the
+            profile).
+        cuts
+            ``((lo, hi), ...)``: the node indices of the range of each viscosity cut;
+            default none.
+
+        Raises
+        ------
+        ValueError
+            For fewer than two nodes, a radius that decreases, a non-positive or
+            non-finite radius, three equal neighbouring radii (a pair is two nodes), or
+            cuts that ``__post_init__`` refuses.
+        """
         r = np.asarray(radius, dtype=np.float64)
         if r.ndim != 1 or r.size < 2:
             raise ValueError("a node table needs a one-dimensional radius with at least two nodes")
@@ -284,6 +322,8 @@ def integrate_gravity(radius, rho0, core_mass, units: Units) -> jax.Array:
     units
         Supplies ``G`` and ``pi``.
 
+    Notes
+    -----
     Numerical caveat: the shell volume ``r_k^3 - r_(k-1)^3`` is a difference of two
     numbers of about ``R^3``; its relative rounding is about ``1e-16 r / (3 dr)``,
     1e-15 on a 129-node table, and the cumulative sum keeps the relative error of
@@ -323,6 +363,16 @@ def _as_f64(x):
 
 class RadialProfile:
     """The radial model of the mantle, CMB first. A JAX pytree.
+
+    Every array is converted with ``jnp.asarray(x, dtype=jnp.float64)``. The
+    constructor validates the inputs (shapes, non-decreasing radius, at least two
+    nodes); the pytree unflatten does not, because JAX unflattens with tracers and
+    placeholders. ``propagate.solve`` checks the values of the concrete leaves.
+
+    The structure is the static auxiliary data of the pytree, and so part of the key of
+    every jitted solve: a profile built from a new radius array compiles again, even
+    with the same node count and pairs. Build a profile once and change its leaves with
+    ``replace``, which keeps the structure.
 
     Parameters
     ----------
@@ -372,8 +422,8 @@ class RadialProfile:
         ``bgrho = 4500 kg/m^3`` (F3).
     uniform_gravity
         Scalar, m/s^2, or ``None`` (default). The value of a uniform background gravity
-        as a traced leaf, so that ``g0`` can be a control (NOTES/chunks/c4-controls-derivatives/01-plan.md
-        D5). It is read only under ``Uniform(None)`` (``formulation.Uniform``), and the
+        as a traced leaf, so that ``g0`` can be a control
+        (NOTES/chunks/c4-controls-derivatives/01-plan.md D5). It is read only under ``Uniform(None)`` (``formulation.Uniform``), and the
         two go together: ``propagate.check_profile`` refuses ``Uniform(None)`` without
         this leaf and this leaf with any other background. ``None`` is an empty subtree,
         so a profile without the leaf keeps its leaves.
@@ -401,15 +451,11 @@ class RadialProfile:
         structure is built from it; with it, the radius can be traced (for a control
         map that moves radii), and the shapes and the core model must agree with it.
 
-    Every array is converted with ``jnp.asarray(x, dtype=jnp.float64)``. The
-    constructor validates the inputs (shapes, non-decreasing radius, at least two
-    nodes); the pytree unflatten does not, because JAX unflattens with tracers and
-    placeholders. ``propagate.solve`` checks the values of the concrete leaves.
-
-    The structure is the static auxiliary data of the pytree, and so part of the key of
-    every jitted solve: a profile built from a new radius array compiles again, even
-    with the same node count and pairs. Build a profile once and change its leaves with
-    ``replace``, which keeps the structure.
+    Attributes
+    ----------
+    rho_top
+        Density of the surface topography in use, kg/m^3: ``surface_density``, or
+        ``rho0[-1]`` when it is ``None`` (eq. 8.3).
     """
 
     __slots__ = ("radius", "rho0", "eta", "core_density", "core_mass", "outer_density",
@@ -481,14 +527,25 @@ class RadialProfile:
 
     def effective_core_mass(self, units: Units) -> jax.Array:
         """Core mass in kg in the gravity integral: ``core_mass``, or the consistent
-        value ``(4 pi / 3) r_c^3 rho_c`` for ``core_mass=None``; ``units`` gives ``pi``."""
+        value ``(4 pi / 3) r_c^3 rho_c`` for ``core_mass=None``.
+
+        Parameters
+        ----------
+        units
+            ``Units``: supplies ``pi``.
+        """
         if self.core_mass is None:
             return consistent_core_mass(self.radius[0], self.core_density, units)
         return self.core_mass
 
     def hydrostatic_gravity(self, units: Units) -> jax.Array:
-        """Hydrostatic gravity at the nodes, m/s^2, ``(N,)`` (eq. 6.1, ``integrate_gravity``),
-        with ``G`` and ``pi`` of ``units``."""
+        """Hydrostatic gravity at the nodes, m/s^2, ``(N,)`` (eq. 6.1, ``integrate_gravity``).
+
+        Parameters
+        ----------
+        units
+            ``Units``: supplies ``G`` and ``pi``.
+        """
         return integrate_gravity(self.radius, self.rho0, self.effective_core_mass(units), units)
 
     def __repr__(self):

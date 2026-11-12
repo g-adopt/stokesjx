@@ -27,3 +27,13 @@ artifacts/
 
 # The outputs of the scripts in examples/ (their default --out).
 examples/output/
+
+# The documentation site: the rendered site, the API reference that quartodoc
+# generates from the docstrings, the Quarto cache, the quartodoc inventories and the
+# build logs of docs/_check_site.py (make docs).
+docs/_site/
+docs/reference/
+docs/.quarto/
+docs/_objects.json
+docs/objects.json
+docs/_logs/

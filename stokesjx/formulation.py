@@ -60,7 +60,12 @@ class Hydrostatic:
 class Uniform:
     """Background gravity of one value at every node (eq. 6.2).
 
-    Attributes
+    The interval steps do not depend on ``g`` (F1), so the value does not change the
+    Pade plan. Under ``NO_SELF_GRAVITY`` the kernels are exact powers of ``g0``: the
+    geoid kernel is proportional to ``1 / g0``, the velocity kernel to ``g0``, and both
+    topographies do not depend on it. Under ``FULL`` the dependence is not a power.
+
+    Parameters
     ----------
     value
         ``g0`` in m/s^2, positive, or ``None`` (default). CODE-A uses 10 (``grav()``,
@@ -72,11 +77,6 @@ class Uniform:
         in the config; NOTES/chunks/c4-controls-derivatives/01-plan.md D5).
         ``propagate.check_profile`` refuses ``Uniform(None)`` without the leaf and the
         leaf with a number here or with ``Hydrostatic()``.
-
-    The interval steps do not depend on ``g`` (F1), so the value does not change the
-    Pade plan. Under ``NO_SELF_GRAVITY`` the kernels are exact powers of ``g0``: the
-    geoid kernel is proportional to ``1 / g0``, the velocity kernel to ``g0``, and both
-    topographies do not depend on it. Under ``FULL`` the dependence is not a power.
     """
 
     value: float | None = None
@@ -154,11 +154,20 @@ class BoundaryCondition(abc.ABC):
     @abc.abstractmethod
     def tangential_unknown(self, radius, eta_ref, side: int, parameter=None) -> tuple:
         """The free tangential direction ``a e2 + b e4`` of the state at the boundary,
-        as ``(a, b)``.
+        as ``(a, b)``. The class docstring states the meaning of each argument.
 
-        Parameters (class docstring): ``radius`` the boundary radius in m, ``eta_ref`` the
-        viscosity scale ``eta_s`` in Pa s, ``side`` +1 at the surface and -1 at the CMB,
-        ``parameter`` ``None`` or a traced boundary parameter."""
+        Parameters
+        ----------
+        radius
+            Traced scalar, the boundary radius in m.
+        eta_ref
+            Traced scalar, the viscosity scale ``eta_s`` of the state in Pa s.
+        side
+            Static Python int, ``+1`` at the surface and ``-1`` at the CMB (the sign of the
+            outward normal of the mantle).
+        parameter
+            ``None`` or a traced scalar, the value of a boundary parameter of the class.
+        """
 
 
 @dataclass(frozen=True)
@@ -172,9 +181,21 @@ class FreeSlip(BoundaryCondition):
 
     def tangential_unknown(self, radius, eta_ref, side: int, parameter=None) -> tuple:
         """``(1.0, 0.0)``: the direction ``e2``, as Python floats for every argument, so
-        that the boundary basis stays a static coefficient array. The arguments
-        ``radius``, ``eta_ref``, ``side`` and ``parameter`` (``BoundaryCondition``) are not
-        read."""
+        that the boundary basis stays a static coefficient array. The arguments are not
+        read.
+
+        Parameters
+        ----------
+        radius
+            Traced scalar, the boundary radius in m.
+        eta_ref
+            Traced scalar, the viscosity scale ``eta_s`` of the state in Pa s.
+        side
+            Static Python int, ``+1`` at the surface and ``-1`` at the CMB (the sign of the
+            outward normal of the mantle).
+        parameter
+            ``None`` or a traced scalar, the value of a boundary parameter of the class.
+        """
         return 1.0, 0.0
 
 
@@ -190,8 +211,20 @@ class NoSlip(BoundaryCondition):
 
     def tangential_unknown(self, radius, eta_ref, side: int, parameter=None) -> tuple:
         """``(0.0, 1.0)``: the direction ``e4``, as Python floats for every argument. The
-        arguments ``radius``, ``eta_ref``, ``side`` and ``parameter``
-        (``BoundaryCondition``) are not read."""
+        arguments are not read.
+
+        Parameters
+        ----------
+        radius
+            Traced scalar, the boundary radius in m.
+        eta_ref
+            Traced scalar, the viscosity scale ``eta_s`` of the state in Pa s.
+        side
+            Static Python int, ``+1`` at the surface and ``-1`` at the CMB (the sign of the
+            outward normal of the mantle).
+        parameter
+            ``None`` or a traced scalar, the value of a boundary parameter of the class.
+        """
         return 0.0, 1.0
 
 
@@ -202,14 +235,14 @@ class DegreeOneFrame(Enum):
         Resolve through the static rule (``degree_one_options``).
     CENTRE_OF_MASS
         The member of the solution family with no degree-1 self-potential, ``N_1 = 0``
-        (10d, 10e): the surface potential row ``y6 - l y5 + c_s y3 = 0`` (eq. 10.5).
+        (10(d), 10(e)): the surface potential row ``y6 - l y5 + c_s y3 = 0`` (eq. 10.5).
         With a split core the model does not conserve momentum, and the CM row adds
         the uniform field that keeps the centre of mass at the origin; its amplitude
         is ``Kernels.degree_one_imbalance`` (eq. 10.6).
     RAW
         The raw surface row ``y6 + (l + 1) y5 + c_s y3 = 0`` (eq. 8.2): no applied
         field. Singular for FULL with hydrostatic gravity, a consistent core and free
-        slip at both boundaries (10a), so not offered there. Caveat (CONVENTIONS 5): a
+        slip at both boundaries (10(a)), so not offered there. Caveat (CONVENTIONS 5): a
         ``core_mass`` number close to the consistent value is a split core, for which
         raw is offered, and the raw system is then nearly singular (raw ratio 2.5e-13
         at a relative offset of 1e-10), so float64 cannot solve it. The default is
@@ -230,7 +263,7 @@ class DegreeOneFrame(Enum):
 class Formulation:
     """The physics flags of one run (PLAN section 5). Frozen and hashable.
 
-    Attributes
+    Parameters
     ----------
     gravity
         ``GravityModel.FULL`` (default) or ``NO_SELF_GRAVITY`` (eq. 5.1, 5.2).
@@ -344,10 +377,10 @@ def degree_one_options(formulation: Formulation, consistent_core: bool) -> Frame
     ``reference_mpmath.frame_options``:
 
     - FULL, hydrostatic, both boundaries traction-free, consistent core: the raw
-      system is singular for every mantle density (10a); CM only, CM default;
+      system is singular for every mantle density (10(a)); CM only, CM default;
     - the same with a split core: CM default, raw offered;
     - FULL, hydrostatic, a boundary with a tangential traction (no slip): the anchor
-      carries no net force (10a), so degree 1 is refused by default; raw on explicit
+      carries no net force (10(a)), so degree 1 is refused by default; raw on explicit
       request for a split core;
     - NO_SELF_GRAVITY or a uniform background: a background field takes the net
       force, raw only (lovejx anchor convention).

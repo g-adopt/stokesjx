@@ -32,8 +32,8 @@ CODE_A_SOURCE = Path(os.environ.get("STOKESJX_CODE_A_SOURCE",
 # The `heavy` marker.
 #
 # tests/heavy_tests.txt lists the test files and test functions that take more than
-# about 2 s each. They carry the `heavy` marker, and the fast tier
-# `-m "not slow and not heavy"` leaves them out. An entry matches every
+# about 2 s each. They carry the `heavy` marker. Plain `pytest` runs every test, and
+# `-m "not heavy"` leaves out the listed tests. An entry matches every
 # parametrisation of a function, because the node id is compared without its
 # `[...]` suffix.
 # --------------------------------------------------------------------------

@@ -1,0 +1,56 @@
+---
+title: "Open points"
+---
+
+This page lists what is not done, not known or not decided. Each item keeps the default
+of the package until the author decides.
+
+## Comparisons against published values
+
+A benchmarks page with comparisons against published values comes later. This work is
+not started.
+
+## The G-ADOPT comparison
+
+The comparison with the geoid of G-ADOPT waits for one answer. It is not yet known what
+the G-ADOPT geoid includes: self-gravitation, the deflected boundaries, and the pressure
+density under the anelastic liquid approximation. The flags of `stokesjx` can then reproduce the same
+problem.
+
+## Physics not implemented
+
+- **The anelastic liquid approximation (ALA).** ALA adds entries to the radial momentum
+  row of the matrix A. It needs a compressibility profile and a Poisson source.
+- **Partial slip.** A partial-slip boundary is a new boundary class with a traced
+  parameter. The interface is in the docstring of `BoundaryCondition`. Its degree-1 frame
+  rule is open: the class carries a tangential traction, and the frame rule then treats
+  it as an anchored boundary.
+
+## TALA and movable boundaries
+
+Under TALA two properties of the discrete model remain ([derivatives](gradients.qmd#the-limits-under-tala)):
+
+- the kernels jump when a viscosity cut crosses a density pair: 0.5 to 2.5 % of the
+  geoid field at viscosity contrasts 3 to 100, and 1.0 to 1.5 nat per crossing of an HMC
+  trajectory at $\sigma_r = 10$ km for 1e22 | 1e21 Pa s;
+- the cut has small kinks at the input nodes: $E_{rms}$ 0.036 nat at a viscosity contrast
+  of 10 and 0.061 nat at 1.1 on a range that ends at the density pair.
+
+## Small known limits
+
+- The bound of the comparison with the mpmath reference has a small margin in the raw
+  frame at `l = 1`: 4.6e-13 against 1e-12.
+- `Layers.pairs` and `MovableRange.members` hold the value `-1` for a cut boundary. `-1`
+  is a valid NumPy index, so a caller must test for it before an index operation.
+- `Layers.sheet_mass(density, kernels)` takes its arguments in the opposite order to
+  `Layers.fields(kernels, density)`.
+
+## Release
+
+The version is `0.0.1.dev0`. There is no release, no `CITATION.cff` and no PyPI package
+yet.
+
+## Outside this package
+
+The joint inversion with lovejx is later work outside this package. `stokesjx` supplies
+the values and the derivatives for it.

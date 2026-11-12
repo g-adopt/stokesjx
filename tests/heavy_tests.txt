@@ -1,8 +1,7 @@
-# Quick-set tests above about 2 s each (measured on reunion, 2026-11-11). They carry
-# the `heavy` marker; the fast tier is `-m "not slow and not heavy"`.
+# Tests above about 2 s each (measured on reunion). They carry the `heavy` marker.
+# Plain `pytest` runs every test, and `-m "not heavy"` leaves out the tests listed here.
 tests/test_reference_legacy.py::test_g1t_transcription_quick
 tests/test_reference_oracle.py::test_g8d_quick
-tests/test_primitives_ad.py::test_standin_gradient_finite_and_vmap
 # Chunk 2 (c2-forward-core): quick tests above about 2 s under `-n 8` (measured on reunion,
 # 2026-11-11, load average 6 to 9). Every quick Taylor case is here.
 tests/test_kernels_ad.py::test_t1_log_eta
@@ -40,10 +39,6 @@ tests/test_controls_ad.py::test_p2
 tests/test_controls_ad.py::test_p3
 tests/test_controls_ad.py::test_g15q_3
 tests/test_controls_ad.py::test_g16q_3
-tests/test_primitives_ad.py::test_interval_step_through_exponent
-tests/test_primitives_ad.py::test_pade_pair_through_elimination
-tests/test_primitives_ad.py::test_solve_elimination_value_and_derivative
-tests/test_primitives_values.py::test_step_equals_oracle_interval_step
 tests/test_reference_oracle.py::test_stored_equals_live_quick
 tests/test_controls_ad.py::test_i7_i8_vmap_and_one_trace
 tests/test_controls_ad.py::test_g15q_1
@@ -91,3 +86,7 @@ tests/test_examples_ad.py
 tests/test_controls_cut.py::test_taylor_radius_linear
 tests/test_controls_cut.py::test_v10_viscosity_pair_and_surface
 tests/test_docs.py::test_readme_quick_start
+# Chunk c7 (c7-docs-cleanup): the step and pair tests of the package methods in
+# tests/test_linalg.py above about 2 s under `-n 8` (measured on reunion, 2026-11-12).
+tests/test_linalg.py::test_interval_step_through_exponent
+tests/test_linalg.py::test_pade_pair_through_elimination

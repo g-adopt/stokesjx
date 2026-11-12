@@ -1,0 +1,3 @@
+# The documentation build of docs.yml. The versions of reunion (2026-11-12).
+quartodoc==0.11.1
+griffe==1.15.0

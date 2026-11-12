@@ -30,22 +30,30 @@ dependencies = ["numpy>=2.0", "jax>=0.4.30", "scipy>=1.11"]
 [project.optional-dependencies]
 # mpmath runs the high-precision reference solver of tests/reference_mpmath.py,
 # and sympy derives the matrix A symbolically in tests/test_equations_symbolic.py.
-test = ["pytest>=8", "pytest-timeout>=2.3", "pytest-xdist>=3.5", "mpmath>=1.3", "sympy>=1.12"]
+# PyYAML reads docs/_quarto.yml in tests/test_docs_site.py.
+test = ["pytest>=8", "pytest-timeout>=2.3", "pytest-xdist>=3.5", "mpmath>=1.3", "sympy>=1.12", "pyyaml>=6"]
 # The analytical Stokes solutions of Kramer, Davies and Wilson (2021, GMD) for
 # tests/test_assess.py. The test skips when the package is absent.
 reference = ["assess>=1.4"]
+# The documentation site (make docs). Quarto is a separate binary (1.10.18). griffe is
+# below 2 because quartodoc 0.11 calls the 1.x parser.
+docs = ["quartodoc>=0.11", "griffe<2"]
 
 [tool.setuptools.packages.find]
 include = ["stokesjx*"]
 
 [tool.pytest.ini_options]
-# The default run is the quick set: every test without the `slow` marker. It is
-# the gate that every chunk runs, and it must finish in at most 300 s wall time
-# with `-n 8` on reunion (NOTES/PLAN.md ruling 12). The slow set runs only when asked for with `-m slow`, or
-# with `-m ""` for both sets. A later `-m` on the command line replaces this one.
-# Inside the quick set, the functions listed in tests/heavy_tests.txt carry the
-# `heavy` marker (tests/conftest.py adds it). The fast tier is
-# `-m "not slow and not heavy"`.
+# One test run: plain `pytest` (and `pytest -n 8`) runs every test. The markers select
+# tests by hand only:
+#   -m slow                      the "slow set" (the tests with the `slow` marker; a
+#                                slow test that repeats a quick test on a full table or
+#                                at a higher degree is the "full tier" of that test),
+#   -m "not slow"                the "quick set" (every test without the `slow` marker),
+#   -m "not slow and not heavy"  the quick set without the tests of tests/heavy_tests.txt,
+#   -m "not legacy"              every test that does not need legacy/.
+# The test files use the names "quick set", "slow set" and "full tier" in this sense.
+# Tests that need legacy/ (the CODE-A copy, not in the repository) or lovejx skip when
+# their reference is not present (tests/conftest.py, tests/test_sh.py).
 # `--dist worksteal`: under pytest-xdist (`-n 8`) an idle worker takes tests from the
 # queue of a busy one, so a few long tests at the end of a queue do not leave the other
 # workers idle (measured 53 to 54 s against 59 to 64 s with `load` for the quick set,
@@ -54,14 +62,17 @@ include = ["stokesjx*"]
 # does not honour them (`--dist loadgroup` distributes as `load` does). Every test is
 # independent of the others (ruling 12); module fixtures share compiled programs inside
 # one worker. Without `-n` the option has no effect.
-addopts = "-m 'not slow' --dist worksteal"
+addopts = "--dist worksteal"
+# Collect from tests/ only: the untracked working notes (NOTES/) hold probe scripts
+# whose names match the test pattern, and they must not join the test run.
+testpaths = ["tests"]
 # Ceiling on one test. `timeout_func_only` keeps fixture setup outside the
 # budget, because the first JAX compile can be slow on its own.
 timeout = 1800
 timeout_func_only = true
 markers = [
-  "slow: above about 30 s with -n 8 on reunion, or the full tier listed in NOTES/CONVENTIONS.md section 7",
-  "heavy: quick-set test above about 2 s, listed in tests/heavy_tests.txt; the fast tier is -m \"not slow and not heavy\"",
+  "slow: a test above about 30 s with -n 8 on reunion, or a test of the full tier (CONVENTIONS 7); select with -m slow or leave out with -m 'not slow'",
+  "heavy: a test above about 2 s, listed in tests/heavy_tests.txt",
   "legacy: needs legacy/ (the untracked CODE-A copy) and, for a rebuild, the Fortran toolchain",
   "taylor_required: fixed physical Taylor acceptance case",
   "taylor_diagnostic: unresolved numerical experiment",

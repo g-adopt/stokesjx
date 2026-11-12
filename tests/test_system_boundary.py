@@ -33,7 +33,7 @@ from stokesjx.formulation import degree_one_options, resolve_degree_one  # noqa:
 MATRIX_TOL = 1e-15
 # Interval steps against the oracle's steps (rounded to float64), max-normalised per
 # interval and degree in the balanced coordinates of the interval
-# (``M -> S D^-1 M D S^-1``, as tests/test_primitives_values.py). Cause: the rounding
+# (``M -> S D^-1 M D S^-1``, the balanced coordinates of the solver). Cause: the rounding
 # of the float64 Pade pair and of its squarings (1e-15 to 4e-15) and of the width
 # ``h`` (log1p form: about 1e-16 relative); the physics review r3 of chunk 1 measured
 # 1.2e-15 at l = 100 on 129 nodes with log1p widths.

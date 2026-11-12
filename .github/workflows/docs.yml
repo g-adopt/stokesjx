@@ -1,0 +1,62 @@
+# Build the documentation site and publish it to GitHub Pages.
+#
+# The API reference is generated from the docstrings by quartodoc, so the job
+# installs the package before it renders. docs/_check_site.py builds the reference
+# and the site and checks both: a parser message, a render warning, a parameter
+# table that differs from the signature, a broken link or display math that does
+# not convert fails the job before the upload. A pull request builds the site and
+# does not publish it.
+name: docs
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build the site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      # The Quarto release of the author's machine, so that the render and its
+      # checks are the same here and there.
+      - uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          version: "1.10.18"
+      # The parameter check imports the package, so the runtime pins apply too.
+      - name: install the package and the documentation extra, pinned
+        run: pip install -r .github/requirements.txt -r .github/requirements-docs.txt -e ".[docs]"
+      - name: build the reference and the site, then check both
+        run: python docs/_check_site.py --build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/_site
+
+  publish:
+    name: publish to GitHub Pages
+    # Only the default branch publishes. A pull request stops after the build.
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

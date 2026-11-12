@@ -1,0 +1,102 @@
+---
+title: "stokesjx"
+subtitle: "Instantaneous viscous response of a spherically symmetric mantle to internal loads (geoid, dynamic topography, surface velocity), in JAX, with derivatives"
+---
+
+## What this code does
+
+`stokesjx` computes the instantaneous viscous (Stokes) response of a spherically
+symmetric, self-gravitating mantle to internal density anomalies.
+
+- **Kernels.** For each spherical-harmonic degree `l` and each source radius, the package
+  computes four kernels. They are the geoid, the dynamic topography of the surface and of
+  the core-mantle boundary (CMB), and the surface velocity.
+- **Fields.** A field is the radial integral of a kernel times a density anomaly. The
+  package also gives the free-air gravity anomaly and the admittance from the field
+  coefficients.
+- **Derivatives.** Every step is written in JAX. The kernels and the fields have
+  derivatives with respect to the layer viscosities and the radii of movable viscosity
+  boundaries. Every leaf of the radial profile has a derivative too. The derivatives are for Hamiltonian
+  Monte Carlo (HMC) over the radial viscosity.
+- **Scope.** The package gives values and derivatives only. It does not choose a
+  sampler or a prior.
+
+## The method
+
+`stokesjx` is a propagator method in the variable `ln r`. For each degree, two sweeps of
+a three-vector basis run through the mantle, one upward from the CMB and one downward
+from the surface. After each interval the basis is orthonormalised. Each sweep therefore
+stays well conditioned, and the method is stable in float64 at every degree.
+
+The Fortran code CODE-A multiplies the propagators of all intervals into one product.
+That product holds the growing and the decaying solutions together, and their ratio over
+the mantle is about $(R/r_c)^{2l+3}$, with $R = 6370$ km and $r_c = 3480$ km. This ratio
+is 2e11 at `l = 20` and 1e27 at `l = 50`, so CODE-A needs 128-bit reals. `stokesjx` needs
+no 128-bit reals. [The physics page](physics.qmd) gives the equations and the method.
+
+## Who wrote the original
+
+**Siavash Ghelichkhan** wrote and developed CODE-A at Ludwig-Maximilians-Universität
+München (2016). The method of CODE-A comes from Corrieu, Thoraval and Ricard (1995) and
+Hager and Clayton (1989). The compressible terms come from Forte and Peltier (1991), and
+the propagator formulation from Ricard, Fleitout and Froidevaux (1984) and Richards and
+Hager (1984).
+
+Parts of `stokesjx` are ported from lovejx (Siavash Ghelichkhan, Jerry X. Mitrovica,
+William Scott and Mark Hoggard). These parts are the layer parameterisation of the
+controls, the integration of gravity, the pattern of the unit scales, the
+spherical-harmonic conventions and the Taylor-test policy. CODE-A uses the quad-precision LINPACK routines
+of John Burkardt. The Fortran is not distributed with `stokesjx`.
+
+::: {.callout-note}
+## How to cite
+
+Cite the method:
+
+Corrieu, V., Thoraval, C. and Ricard, Y. (1995). Mantle dynamics and geoid Green
+functions. *Geophysical Journal International*, **120**, 516-523.
+
+Hager, B. H. and Clayton, R. W. (1989). Constraints on the structure of mantle
+convection using seismic observations, flow models, and the geoid. In *Mantle
+Convection: Plate Tectonics and Global Dynamics*, ed. W. R. Peltier, Gordon and Breach,
+657-763.
+
+Cite the software by its repository, <https://github.com/g-adopt/stokesjx>. The
+repository has no `CITATION.cff` yet ([open points](open-points.qmd)).
+:::
+
+## Validation
+
+Three independent references check the values:
+
+| Reference | Bound | Measured |
+|---|---|---|
+| CODE-A golden output under CODE-A's own switches, all 50 degrees | `1e-12` | 2.7e-14 (hager4), 1.8e-13 (smooth viscosity) |
+| A second solver in mpmath at 50 to 250 digits, degrees 1 to 200 | `1e-12` | at most 8.5e-14 on the moderate cases |
+| Analytical solutions of Kramer, Davies and Wilson (2021) through `assess` | `1e-12` | 1.2e-14 |
+
+[The validation page](validation.qmd) gives the detail, and [the open
+points](open-points.qmd) state what is not checked yet.
+
+## Install
+
+Install the package from a source checkout:
+
+```sh
+git clone https://github.com/g-adopt/stokesjx
+cd stokesjx
+pip install -e ".[test]"
+```
+
+[The install page](install.qmd) gives the other extras and the test run.
+
+## Agentic coding
+
+Agentic coding tools wrote this software under the direction and review of the author.
+[The agentic-coding page](agentic-coding.qmd) states what the tools wrote, what the
+author decided, and which checks the result must pass.
+
+## Licence
+
+`stokesjx` is released under the Apache License, Version 2.0. The `NOTICE` file records
+who wrote what. Anyone who redistributes the code must keep that file with it.

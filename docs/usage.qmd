@@ -1,0 +1,157 @@
+---
+title: "Using the package"
+---
+
+This page shows a forward run, the physics flags, the fields and the file formats of
+CODE-A. The code blocks run in order, and a test of the package runs them.
+
+## A forward run
+
+A `RadialProfile` is the radial model: the node radii (CMB first), the reference density
+`rho0` and the viscosity `eta` at the nodes, and the core. Two equal neighbouring radii
+are a jump pair. A `StokesConfig` holds the static choices: the maximum degree, the
+physics flags, the units and the numerical options. `stokes_kernels` is a pure function
+of the two.
+
+```python
+import numpy as np
+import stokesjx as sj
+
+radius = np.linspace(3480e3, 6370e3, 65)                    # m, CMB first
+rho0 = np.linspace(5500.0, 3300.0, 65)                      # kg/m^3
+eta = np.where(radius > 5700e3, 1e21, 1e22)                 # Pa s
+profile = sj.RadialProfile(radius, rho0, eta, core_density=9900.0)
+config = sj.StokesConfig(lmax=20)
+
+K = sj.stokes_kernels(profile, config)
+assert K.degrees == tuple(range(1, 21))
+assert K.geoid.shape == (20, 65)                            # (degrees, source nodes)
+```
+
+`Kernels` holds four arrays of shape `(L, N)`, one row per degree of `K.degrees` and one
+column per source node, in SI units:
+
+| Kernel | Unit | Meaning |
+|---|---|---|
+| `geoid` | m per kg/m² | geoid height at the surface |
+| `surface_topography` | m per kg/m² | dynamic topography of the surface, outward positive |
+| `cmb_topography` | m per kg/m² | dynamic topography of the CMB, outward positive |
+| `surface_velocity` | m/s per kg/m² | coefficient of the root mean square horizontal speed |
+
+A kernel is the response to a sheet of 1 kg/m² in one spherical harmonic at the source
+node. `K.row(l)` gives the row of degree `l`. Where the frame rule refuses degree 1, the
+rows start at `l = 2`.
+
+A profile built from a new radius array compiles again. To change the viscosity or the
+density, use `profile.replace(eta=...)`, which keeps the structure of the node table.
+
+## Physics flags
+
+`Formulation` holds five flags, and every one of the 32 combinations is solved:
+
+| Flag | Values | Default |
+|---|---|---|
+| `gravity` | `GravityModel.FULL`, `GravityModel.NO_SELF_GRAVITY` | `FULL` |
+| `background` | `Hydrostatic()`, `Uniform(value)` | `Hydrostatic()` |
+| `compressible` | `False` (incompressible), `True` (TALA) | `False` |
+| `surface` | `FreeSlip()`, `NoSlip()` | `FreeSlip()` |
+| `cmb` | `FreeSlip()`, `NoSlip()` | `FreeSlip()` |
+
+```python
+form = sj.Formulation(gravity=sj.GravityModel.NO_SELF_GRAVITY, background=sj.Uniform(10.0),
+                      compressible=True, surface=sj.NoSlip(), cmb=sj.FreeSlip())
+K2 = sj.stokes_kernels(profile, sj.StokesConfig(lmax=20, formulation=form))
+assert float(np.max(np.abs(np.asarray(K2.surface_velocity)))) == 0.0   # no slip at the surface
+```
+
+`DegreeOneFrame` is the frame request of degree 1. The default follows a static rule. It
+gives the centre-of-mass frame for FULL with hydrostatic gravity and free slip at both
+boundaries, and the raw frame for NO_SELF_GRAVITY or a uniform background. FULL with
+hydrostatic gravity and a no-slip boundary has no degree 1 ([physics, section
+10](physics.qmd#degree-1)).
+
+## Fields
+
+A density anomaly is an array with the radial axis first and the degree and order axes
+last. For a real convention the `C/S` axis comes before them:
+`(N, 2, Ld+1, Ld+1)`. `apply` integrates the four kernels against the density with the
+trapezoid weights of the node table. A field has the layout and the convention of the
+density.
+
+```python
+density = np.zeros((65, 2, 21, 21))                         # kg/m^3, real_4pi, CMB first
+density[30:40, 0, 2, 0] = 10.0
+F = sj.apply(K, density, profile)                           # F.geoid: (2, 21, 21), m
+
+# The same field with explicit weights.
+w = sj.quadrature_weights(profile)                          # (65,), m
+F_w = sj.fields.radial_integral(K, density, w)
+assert np.allclose(np.asarray(F_w.geoid), np.asarray(F.geoid), rtol=1e-15, atol=0.0)
+```
+
+`sh.CONVENTIONS` holds the three coefficient conventions:
+
+| Convention | Shape | Normalisation |
+|---|---|---|
+| `complex_4pi` | `(..., L+1, L+1)` complex | 4π-normalised complex harmonics (lovejx) |
+| `real_4pi` | `(..., 2, L+1, L+1)` real | 4π-normalised real harmonics (SHTOOLS, CODE-A density files) |
+| `real_orthonormal` | `(..., 2, L+1, L+1)` real | orthonormal real harmonics (CODE-A output files) |
+
+`sh.convert` converts between them, and `sh.synthesis_grid` evaluates coefficients on a
+latitude-longitude grid. The free-air gravity anomaly, the admittance and a weighted
+spectral misfit are post-processing of the field coefficients:
+
+```python
+U = sj.sh.convert(F.geoid, "real_4pi", "complex_4pi")       # (21, 21) complex
+lat = np.arange(89.0, -90.0, -2.0)                          # degrees north
+lon = np.arange(-179.0, 180.0, 2.0)                         # degrees east
+grid = sj.sh.synthesis_grid(F.geoid, "real_4pi", lat, lon)  # (90, 180), m
+
+g_R = sj.surface_gravity(profile, config)                   # m/s^2
+dg = sj.gravity_anomaly(F.geoid, g_R, radius[-1])           # m/s^2
+Z = sj.admittance(dg, F.surface_topography, "real_4pi")     # (21,), s^-2
+weights = np.where(np.arange(21) >= 2, 1.0, 0.0)
+misfit = sj.spectral_misfit(F.geoid, np.zeros((2, 21, 21)), weights, "real_4pi")
+assert np.all(np.isfinite(np.asarray(grid))) and np.isfinite(float(misfit))
+```
+
+## CODE-A file formats
+
+`stokesjx.io.legacy` reads and writes the file formats of CODE-A: the density file
+(`read_sph`), the viscosity file (`read_viscosity`) and the `SPHCO` coefficient files
+(`read_sphco`, `write_sphco`). The package does not import the module, so import it on
+use. Each data line of an `SPHCO` file holds `l`, `m`, `C` and `S` in this order. The
+header of a CODE-A file says "Cnm, Snm(m<0)", which is not the data order.
+
+```python
+from stokesjx.io import legacy
+
+coef = np.asarray(sj.sh.convert(F.geoid, "real_4pi", "real_orthonormal"))
+legacy.write_sphco("SPH_geoid", coef, digits=16)            # es25.16e3, degrees 1 to 20
+back = legacy.read_sphco("SPH_geoid")                       # (2, 21, 21), real_orthonormal
+assert np.allclose(back[:, 1:], coef[:, 1:], rtol=1e-15, atol=1e-30)
+```
+
+The script `examples/forward_legacy_density.py` runs a forward calculation from a CODE-A
+density file and writes the four fields in the `SPHCO` format, with the file names of
+CODE-A:
+
+```sh
+python examples/forward_legacy_density.py --sph PATH --out DIR [--grid]
+```
+
+## Examples
+
+The directory `examples/` holds three scripts. Each script writes its output to `--out`
+(default `examples/output/`). Measured wall times on a Mac Studio:
+
+| Script | Command | Output | Time |
+|---|---|---|---|
+| forward run from a CODE-A density file | `python examples/forward_legacy_density.py --sph PATH --grid` | the four fields as `SPHCO` files, an npz file with the kernels and the fields, and with `--grid` the fields on a 1-degree grid | 1.0 s (`lmax = 50`, 129 nodes, with `--grid`) |
+| gradient of a geoid misfit against central differences | `python examples/gradient_layers.py` | a JSON summary | 2.0 s |
+| HMC over four layer viscosities and one movable boundary | `python examples/hmc_layers.py` | a JSON summary with the samples, the energy errors and the effective sample size | 130 s (1000 transitions); `--smoke` 3 s |
+
+`examples/earth_model.py` builds the PREM-like node table of the examples. The gradient
+and the HMC example move one viscosity boundary with `Layers` by `motion="cut"`, the default of `Layers`
+([derivatives](gradients.qmd#movable-boundaries)).
+The HMC script is an example only ([derivatives](gradients.qmd#notes-for-samplers)).

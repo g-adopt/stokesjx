@@ -6,6 +6,13 @@ independent evaluations of the conventions (scipy ``lpmv`` with the Condon-Short
 phase removed, lovejx ``evaluate`` of the converted complex coefficients, CODE-A's
 orthonormal formula transcribed from calc.f:94-115), and the Fortran ``GRD_*`` grids of
 a golden run.
+
+The tests that compare with lovejx take the fixture ``sht`` and skip when lovejx is not
+installed (lovejx is not on PyPI, and CI does not install it):
+``test_legendre_table_equals_lovejx``, ``test_gauss_legendre_equals_lovejx``,
+``test_convention_definitions_lovejx``, ``test_synthesis_grid_against_evaluate`` and
+``test_gl_port_equals_lovejx``. Every other test of this file runs without lovejx;
+``test_synthesis_grid_against_fortran_grd`` needs ``legacy/`` and skips without it.
 """
 
 from __future__ import annotations
@@ -22,7 +29,15 @@ from scipy.special import lpmv  # noqa: E402
 import stokesjx as sj  # noqa: E402
 from stokesjx import sh  # noqa: E402
 
-sht = pytest.importorskip("lovejx.sealevel.sht")
+
+
+@pytest.fixture(scope="module")
+def sht():
+    """``lovejx.sealevel.sht``, the module that ``stokesjx.sh`` ports. The tests that
+    compare with it skip when lovejx is not installed (lovejx is not on PyPI and CI
+    does not install it); the other tests of this file run without it."""
+    return pytest.importorskip("lovejx.sealevel.sht")
+
 
 # Round trips of the conversions, relative to the largest coefficient. Cause: one
 # multiplication and one division by sqrt(2) or sqrt(4 pi) per entry.
@@ -66,13 +81,13 @@ def _random_real(L, batch=(), seed=0):
 
 
 @pytest.mark.parametrize("L", [50, 256])
-def test_legendre_table_equals_lovejx(L):
+def test_legendre_table_equals_lovejx(L, sht):
     x = np.linspace(-0.999, 0.999, 37)
     assert np.array_equal(sh.legendre_table(L, x), sht.legendre_table(L, x))
 
 
 @pytest.mark.parametrize("L", [50, 256])
-def test_gauss_legendre_equals_lovejx(L):
+def test_gauss_legendre_equals_lovejx(L, sht):
     a, b = sh.gauss_legendre(L + 1), sht.gauss_legendre(L + 1)
     assert np.array_equal(a[0], b[0]) and np.array_equal(a[1], b[1])
 
@@ -136,24 +151,29 @@ def _eval_codea_orthonormal(c_on, s_on, x, lam):
     return f
 
 
-@pytest.mark.parametrize("L", [12, 50])
-def test_convention_definitions(L):
-    """The three conventions of D9 at 40 random points: ``synthesis_grid`` of each
-    convention (evaluated point by point on a one-point grid per latitude) against
-    scipy ``lpmv``, lovejx ``evaluate`` of the converted complex coefficients and CODE-A's
-    orthonormal formula."""
+def _convention_case(L):
+    """Random ``real_4pi`` coefficients of degree ``L`` (seed 2), 40 random points
+    (seed 3), and the reference values of scipy ``lpmv`` at the points. Returns
+    ``(c, colat, lon, x, lam, ref, scale)``."""
     c = _random_real(L, seed=2)
     rng = np.random.default_rng(3)
     colat = rng.uniform(1, 179, 40)
     lon = rng.uniform(-180, 180, 40)
     x, lam = np.cos(np.radians(colat)), np.radians(lon)
     ref = _eval_real_4pi(c[0], c[1], x, lam)
-    scale = np.max(np.abs(ref))
+    return c, colat, lon, x, lam, ref, np.max(np.abs(ref))
+
+
+@pytest.mark.parametrize("L", [12, 50])
+def test_convention_definitions(L):
+    """The three conventions of D9 at 40 random points: ``synthesis_grid`` of each
+    convention (evaluated point by point on a one-point grid per latitude) against
+    scipy ``lpmv``, and CODE-A's orthonormal formula against scipy ``lpmv``. The
+    comparison with lovejx ``evaluate`` is ``test_convention_definitions_lovejx``."""
+    c, colat, lon, x, lam, ref, scale = _convention_case(L)
     U = np.asarray(sh.convert(c, "real_4pi", "complex_4pi"))
-    lj = np.asarray(sht.evaluate(U, colat, lon))
     on = c * math.sqrt(4 * math.pi)
     codea = _eval_codea_orthonormal(on[0], on[1], x, lam)
-    assert np.max(np.abs(lj - ref)) <= SH_EVAL_TOL * scale
     assert np.max(np.abs(codea - ref)) <= SH_EVAL_TOL * scale
     for conv, coef in (("real_4pi", c), ("real_orthonormal", on), ("complex_4pi", U)):
         grid = np.asarray(sh.synthesis_grid(coef, conv, 90.0 - colat, lon))     # (40, 40): all pairs
@@ -161,8 +181,18 @@ def test_convention_definitions(L):
         assert np.max(np.abs(mine - ref)) <= SH_EVAL_TOL * scale, conv
 
 
+@pytest.mark.parametrize("L", [12, 50])
+def test_convention_definitions_lovejx(L, sht):
+    """lovejx ``evaluate`` of the converted complex coefficients against scipy ``lpmv``
+    at the 40 random points of ``test_convention_definitions``."""
+    c, colat, lon, x, lam, ref, scale = _convention_case(L)
+    U = np.asarray(sh.convert(c, "real_4pi", "complex_4pi"))
+    lj = np.asarray(sht.evaluate(U, colat, lon))
+    assert np.max(np.abs(lj - ref)) <= SH_EVAL_TOL * scale
+
+
 @pytest.mark.parametrize("L", [50, 100])
-def test_synthesis_grid_against_evaluate(L):
+def test_synthesis_grid_against_evaluate(L, sht):
     """``synthesis_grid`` on a 1-degree grid against lovejx ``evaluate`` at the same
     points, each convention."""
     c = _random_real(L, seed=4)
@@ -177,16 +207,30 @@ def test_synthesis_grid_against_evaluate(L):
         assert np.max(np.abs(g - ref)) <= SH_EVAL_TOL * np.max(np.abs(ref)), conv
 
 
-@pytest.mark.parametrize("L", [50, 100])
-def test_gl_round_trip_and_port(L):
-    """``analysis(synthesis(U))`` on ``GaussLegendreGrid.build(L+1, 2L+3, L)`` is the
-    identity, and both transforms equal lovejx's."""
+def _gl_case(L):
+    """The Gauss-Legendre grid ``GaussLegendreGrid.build(L+1, 2L+3, L)``, random complex
+    coefficients ``U`` (seed 5), the synthesis ``f`` and the analysis ``U2`` of ``f``."""
     grid = sh.GaussLegendreGrid.build(L + 1, 2 * L + 3, L)
-    ref_grid = sht.GaussLegendreGrid.build(L + 1, 2 * L + 3, L)
     U = np.asarray(sh.convert(_random_real(L, seed=5), "real_4pi", "complex_4pi"))
     f = np.asarray(jax.jit(sh.synthesis)(grid, U))
     U2 = np.asarray(jax.jit(sh.analysis)(grid, f))
+    return grid, U, f, U2
+
+
+@pytest.mark.parametrize("L", [50, 100])
+def test_gl_round_trip(L):
+    """``analysis(synthesis(U))`` on ``GaussLegendreGrid.build(L+1, 2L+3, L)`` is the
+    identity."""
+    _, U, _, U2 = _gl_case(L)
     assert np.max(np.abs(U2 - U)) <= GL_ROUNDTRIP_TOL * np.max(np.abs(U))
+
+
+@pytest.mark.parametrize("L", [50, 100])
+def test_gl_port_equals_lovejx(L, sht):
+    """The synthesis and the analysis on ``GaussLegendreGrid.build(L+1, 2L+3, L)`` equal
+    those of lovejx on its own grid of the same size."""
+    _, U, f, U2 = _gl_case(L)
+    ref_grid = sht.GaussLegendreGrid.build(L + 1, 2 * L + 3, L)
     f_ref = np.asarray(sht.synthesis(ref_grid, U))
     assert np.max(np.abs(f - f_ref)) <= GL_PORT_TOL * np.max(np.abs(f_ref))
     U_ref = np.asarray(sht.analysis(ref_grid, f))

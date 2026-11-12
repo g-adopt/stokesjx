@@ -1,0 +1,98 @@
+---
+title: "Install and first run"
+---
+
+## From a source checkout
+
+`stokesjx` needs Python 3.12 or later, NumPy, JAX and SciPy. There is no PyPI package
+yet. Install the package in editable mode with the test dependencies:
+
+```sh
+git clone https://github.com/g-adopt/stokesjx
+cd stokesjx
+pip install -e ".[test]"
+```
+
+The extras of `pyproject.toml`:
+
+| Extra | Contents | Use |
+|---|---|---|
+| `test` | pytest, pytest-timeout, pytest-xdist, mpmath, sympy, PyYAML | the test suite |
+| `reference` | `assess` | the tests against the analytical solutions of Kramer, Davies and Wilson (2021) |
+| `docs` | quartodoc, griffe below 2 | the API reference of this site |
+
+For every test, install `pip install -e ".[test,reference]"`. To build this site, install
+the extra `docs` and Quarto 1.10.18.
+
+## Double precision
+
+The package sets `jax_enable_x64` at import. Every array is float64. The sweeps keep each
+step well conditioned, but each step loses a few digits, and single precision leaves
+nothing for the derivatives.
+
+## Run the tests
+
+One command runs every test:
+
+```sh
+python -m pytest -n 8
+```
+
+The markers select tests by hand only:
+
+| Command | Tests |
+|---|---|
+| `python -m pytest -n 8 -m slow` | the tests with the marker `slow` |
+| `python -m pytest -n 8 -m "not slow"` | every test without the `slow` marker |
+| `python -m pytest -n 8 -m "not heavy"` | every test except the tests of `tests/heavy_tests.txt` (above about 2 s each) |
+| `python -m pytest -n 8 -m "not legacy"` | every test that does not need `legacy/` |
+
+Measured on the author's machine (Mac Studio, 32 CPUs) with `-n 8` on 2026-11-12: 1101
+tests pass in 339 s, with 0 skipped.
+
+The marker `slow` marks a test above about 30 s with `-n 8`, or a test that repeats
+another test on a full table or at a higher degree.
+
+Two groups of tests skip when their reference is not installed:
+
+- The tests that need `legacy/` skip without it. `legacy/` holds the Fortran reference
+  CODE-A, which is not distributed.
+- The 13 tests that compare with lovejx skip without it. lovejx is not on PyPI, and its
+  repository is not public yet. With `pip install -e` of a lovejx checkout, these tests
+  run.
+
+The CI job runs every other test. It skips 25 tests: 12 tests that need `legacy/` and the
+13 tests that compare with lovejx.
+
+## Build the documentation
+
+```sh
+make docs           # build the API reference and the site, then check both
+make docs-preview   # render the site and serve it with live reload (no checks)
+```
+
+`make docs` runs `docs/_check_site.py --build`. It fails on a parser message of the
+reference, a warning of the render or a parameter table that differs from the signature.
+It also fails on a broken link and on display math that does not convert.
+
+## First calculation
+
+One forward call on a 129-node table:
+
+```python
+import numpy as np
+import stokesjx as sj
+
+radius = np.linspace(3480e3, 6370e3, 129)                  # m, CMB first
+rho0 = np.linspace(5500.0, 3300.0, 129)                     # kg/m^3
+eta = np.where(radius > 5700e3, 1e21, 1e22)                 # Pa s
+profile = sj.RadialProfile(radius, rho0, eta, core_density=9900.0)
+config = sj.StokesConfig(lmax=50)
+
+K = sj.stokes_kernels(profile, config)                      # K.geoid: (50, 129), m per kg/m^2
+density = np.zeros((129, 2, 51, 51))                        # kg/m^3, real_4pi, CMB first
+density[:, 0, 2, 0] = 10.0
+F = sj.apply(K, density, profile)                           # F.geoid: (2, 51, 51), m
+```
+
+[The usage page](usage.qmd) explains each step.

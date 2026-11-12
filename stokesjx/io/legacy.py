@@ -34,9 +34,9 @@ _END = "... END OF FILE!"
 
 @dataclass(frozen=True)
 class SphDensity:
-    """The content of a ``.sph`` density file.
+    """The content of a ``.sph`` density file. ``read_sph`` builds it.
 
-    Attributes
+    Parameters
     ----------
     lmax
         ``LMAX`` of the file (columns 8-11 of the first line).
@@ -71,9 +71,10 @@ def read_viscosity(path, n_nodes: int, *, unit: float = VISC0) -> np.ndarray:
 
     Returns
     -------
-    ``(n_nodes,)`` float64, Pa s, CMB first. Each line gives its first number, as the
-    list-directed ``read(183, *) rvsc(i)`` takes it; a missing final newline is fine.
-    Fewer than ``n_nodes`` values raise ``ValueError``.
+    numpy.ndarray
+        ``(n_nodes,)`` float64, Pa s, CMB first. Each line gives its first number, as
+        the list-directed ``read(183, *) rvsc(i)`` takes it; a missing final newline is
+        fine. Fewer than ``n_nodes`` values raise ``ValueError``.
     """
     values = []
     with open(path) as fh:
@@ -106,7 +107,8 @@ def read_sph(path) -> SphDensity:
 
     Returns
     -------
-    ``SphDensity`` with the radius in m and everything CMB first.
+    SphDensity
+        The radius in m and every array CMB first.
     """
     with open(path) as fh:
         lines = fh.read().splitlines()
@@ -207,6 +209,10 @@ def _format_es25_16e3(x: float) -> str:
 def write_sphco(path, coefficients, *, lmin: int = 1, digits: int = 6, header: tuple[str, ...] | None = None) -> None:
     """Write coefficients in the format of CODE-A's ``sphcout`` (util.f90:215-240).
 
+    Each data line is ``SPHCO``, ``l`` and ``m`` as ``I8``, then ``C`` and ``S``; the ``S``
+    of ``m = 0`` is written as zero, as in CODE-A. The last line is
+    ``... END OF FILE!``.
+
     Parameters
     ----------
     path
@@ -223,10 +229,6 @@ def write_sphco(path, coefficients, *, lmin: int = 1, digits: int = 6, header: t
         The lines before the data; default ``DEFAULT_HEADER``, CODE-A's four lines with a
         correct column line (C, then S). Pass the header of a Fortran file to reproduce
         it byte for byte.
-
-    Each data line is ``SPHCO``, ``l`` and ``m`` as ``I8``, then ``C`` and ``S``; the ``S``
-    of ``m = 0`` is written as zero, as in CODE-A. The last line is
-    ``... END OF FILE!``.
     """
     c = np.asarray(coefficients, dtype=np.float64)
     if c.ndim != 3 or c.shape[0] != 2 or c.shape[1] != c.shape[2]:

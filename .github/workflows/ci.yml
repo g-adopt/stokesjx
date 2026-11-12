@@ -1,0 +1,68 @@
+# The test run of stokesjx on the self-hosted runners of the g-adopt organisation.
+#
+# One job runs every test of the repository (plain pytest runs every test, see
+# pyproject.toml). Two groups of tests skip here, because their reference is not
+# on the runner: the tests that need legacy/ (the Fortran reference CODE-A, not in
+# the repository) and the 13 tests that compare with lovejx (not on PyPI, see
+# .github/requirements.txt). .github/check_skips.py fails the job on any other skip.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  JAX_ENABLE_X64: "true"
+  # The pytest call below runs the tests in parallel worker processes
+  # (pytest-xdist, `-n`). Each worker must then use one thread for its own
+  # linear algebra, otherwise four workers on a four-core runner would each
+  # start four BLAS and XLA threads and slow each other down. The XLA flag
+  # turns off the multi-threaded Eigen back end that JAX uses on the CPU.
+  OMP_NUM_THREADS: "1"
+  OPENBLAS_NUM_THREADS: "1"
+  XLA_FLAGS: "--xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1"
+
+jobs:
+  tests:
+    name: every test
+    runs-on: [self-hosted, Linux, X64]
+    # The g-adopt organisation's "General" runner group: four cores and 32 GB
+    # each. The plain Python image gives every job a clean interpreter, so the
+    # runner host needs nothing installed apart from Docker. The `Linux` label
+    # keeps the job off the macOS runner of the organisation.
+    container: python:3.12-bookworm
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-${{ hashFiles('.github/requirements.txt', 'pyproject.toml') }}
+      - name: install the package with its test and reference extras, pinned
+        run: pip install -r .github/requirements.txt -e ".[test,reference]"
+      # Every test. The tests that need legacy/ (the Fortran reference, not in
+      # the repository) and the 13 tests that compare with lovejx (not installed
+      # here, see .github/requirements.txt) skip; the next step checks that no
+      # other test skips. The package comes from the editable install, and
+      # tests/conftest.py puts tests/ on the import path.
+      - name: run every test
+        run: python -m pytest -n auto -q -rs -p no:cacheprovider --junitxml=artifacts/pytest.xml
+      # A test that skips for another reason (a missing pin, a wheel that does not
+      # load) fails here. The count 25 is 12 legacy tests and 13 lovejx tests.
+      - name: check the skipped tests
+        if: always()
+        run: python .github/check_skips.py artifacts/pytest.xml --expected 25
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pytest
+          path: artifacts/

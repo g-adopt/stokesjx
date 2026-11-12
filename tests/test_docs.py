@@ -58,8 +58,8 @@ EXCLUDED = {
 }
 
 README_HEADINGS = ("# stokesjx", "## Status", "## Install", "## Quick start", "## Examples", "## Test",
-                   "## Validation", "## Performance", "## Notes for samplers", "## Credit", "## Layout",
-                   "## Licence")
+                   "## Validation", "## Performance", "## Notes for samplers", "## Credit", "## Agentic coding",
+                   "## Layout", "## Licence")
 BANNED_MODALS = ("should", "may", "might", "could", "would")
 #: The start of an absolute home path on macOS. Written in two parts, so that this tracked
 #: file itself holds no such path (the hygiene gate greps every tracked file for it).

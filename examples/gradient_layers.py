@@ -31,10 +31,12 @@ boundary at 5690 km) without noise, and the misfit is ``spectral_misfit`` with t
 
 The base point. The gradient is evaluated at ``Y_REF = ln(1e22, 1e21, 1e21, 1e21)`` Pa s
 and the boundary at 5750 km: a lower mantle ten times stiffer than the three layers
-above, so that there is a viscosity contrast of 10 across the movable boundary. When the
-viscosities on both sides of a boundary are equal, the position of the boundary has no
-effect on the kernels, and the radius derivative is exactly zero (measured at the
-isoviscous point: -1.9e-15 on the full table, -3.3e-16 on the reduced table). At
+above, so that there is a viscosity contrast of 10 across the movable boundary. This
+example uses the default ``motion="cut"``. Under the cut, when the viscosities on both
+sides of a boundary are equal, the position of the boundary has no effect on the kernels,
+and the radius derivative is exactly zero (measured at the isoviscous point: -1.9e-15 on
+the full table, -3.3e-16 on the reduced table). Under ``motion="affine"`` the derivative
+is small but not zero, because the moved nodes change the density table. At
 ``Y_REF`` the radius derivative is 1.82 m^-1 (full table, ``lmax = 20``) and 0.925 m^-1
 (reduced, ``lmax = 6``). The base radius is 10.4 km (full) and 50 km (reduced) from the
 nearest input node, so the central difference of 50 m does not cross a node.

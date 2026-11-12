@@ -114,12 +114,9 @@ def S1():
     hager4 boundaries at 100, 400 and 670 km inserted as pairs (135 nodes), the 670 km
     boundary movable in (5466.875, 5970) km; the 400 km pair is an inserted FIXED pair
     and the upper range end (review r3 minor 9)."""
-    import sys
-    from conftest import REPO
-    if str(REPO / "benchmarks") not in sys.path:
-        sys.path.insert(0, str(REPO / "benchmarks"))
-    import bench_forward as bf
-    p = bf.golden_profile()
+    # The node table of the golden run hager4_fsfs (129 LEBEDEV nodes, hager4
+    # viscosity, rho_c = 9900, consistent core), as a profile with the default flags.
+    p = profile_from_table(cases.golden_table("hager4_fsfs"))
     return sj.Layers(p, np.array([3480, 5700, 5970, 6270, 6370]) * KM, movable={1: (5466.875 * KM, 5970 * KM)},
                      motion="affine")
 

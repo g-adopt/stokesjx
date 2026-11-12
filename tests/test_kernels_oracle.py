@@ -152,9 +152,10 @@ def _check_keys(case_name, label, l, frame, sol, O, tol, imb_tol):
     return worst
 
 
-# Tests that solve the same (table, lmax) run on one xdist worker (``--dist
-# loadgroup`` in pyproject.toml), so that each solve compiles once in the quick set
-# (plan section 7, G10).
+# The xdist group of the tests that solve the same (table, lmax). The setting of
+# pyproject.toml is ``--dist worksteal``, which does not honour the groups, so they are
+# documentation only (pyproject.toml); the module fixtures share the compiled solves
+# inside one worker.
 _GROUP = {"hager4_full_fsfs": "hager4_full", "hager4_full_fsfs_high": "hager4_full",
           "wide5_full_fsfs": "wide5_full", "wide5_full_fsfs_high": "wide5_full",
           "hager": "hager_q", "prem": "prem_q"}

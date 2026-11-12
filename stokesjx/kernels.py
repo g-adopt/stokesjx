@@ -31,7 +31,7 @@ from .units import Units
 class Numerics:
     """Numerical options of the solver. Static.
 
-    Attributes
+    Parameters
     ----------
     rho0_max
         Upper limit of ``rho0`` in kg/m^3 for the static norm bound of the interval
@@ -49,7 +49,7 @@ class Numerics:
         as fast or faster with it (S1, 129 nodes and ``lmax = 50``: 15.9 against 16.4 ms
         for the gradient with respect to ``log eta``) and its gradient compiles in about
         0.74 s against 1.03 s; the elimination is 5 to 7 % faster only in the forward
-        map (``benchmarks/bench_forward.py``, NOTES/benchmarks.md).
+        map (``NOTES/benchmarks/scripts/bench_forward.py``, NOTES/benchmarks.md).
     kappa_h_max
         Static upper limit of ``|kappa_h| = |ln(rho0_i / rho0_(i-1))|`` on an ordinary
         interval under TALA (dimensionless), for the norm bound of the interval
@@ -88,7 +88,7 @@ class Numerics:
 class StokesConfig:
     """Static configuration of a kernel computation. Frozen and hashable.
 
-    Attributes
+    Parameters
     ----------
     lmax
         Largest spherical-harmonic degree; the kernels hold the degrees
@@ -146,12 +146,15 @@ class Kernels:
     Equality is identity (``eq=False``): an elementwise comparison of arrays has no
     single truth value, so two kernel records are compared array by array.
 
-    Attributes
+    ``stokes_kernels`` builds the record; the fields below are its constructor
+    parameters and its attributes.
+
+    Parameters
     ----------
     degrees
         The degrees of the rows, contiguous: ``(1, ..., lmax)``, or ``(2, ..., lmax)``
         where the frame rule refuses degree 1 (FULL with hydrostatic gravity and a
-        no-slip boundary, CONVENTIONS 5), so that no row of a kernel array is NaN.
+        no-slip boundary; CONVENTIONS 5), so that no row of a kernel array is NaN.
         ``row(l)`` is the one way to index a degree.
     degree_one_frame
         The resolved frame at ``l = 1`` (``CENTRE_OF_MASS``, ``RAW`` or
@@ -197,7 +200,14 @@ class Kernels:
     degree_one_imbalance: jax.Array | None
 
     def row(self, l: int) -> int:
-        """Index of degree ``l`` in the kernel arrays."""
+        """Index of degree ``l`` in the kernel arrays.
+
+        Parameters
+        ----------
+        l
+            A degree of ``degrees``. A degree that the kernels do not hold raises
+            ``KeyError``.
+        """
         try:
             return self.degrees.index(int(l))
         except ValueError:
@@ -241,9 +251,12 @@ def stokes_kernels(profile: RadialProfile, config: StokesConfig) -> Kernels:
 
     Returns
     -------
-    ``Kernels`` with arrays of shape ``(L, N)`` over ``Kernels.degrees`` (``row(l)`` gives
-    the row of degree ``l``) and ``degree_one_imbalance`` of shape ``(N,)`` or ``None``.
+    Kernels
+        The arrays of shape ``(L, N)`` over ``Kernels.degrees`` (``row(l)`` gives the row
+        of degree ``l``) and ``degree_one_imbalance`` of shape ``(N,)`` or ``None``.
 
+    Notes
+    -----
     The jit key. The structure of the profile (``NodeStructure``: the construction
     radii, the pairs, the core model) is static, so a profile built from a new radius
     array compiles again (about 0.3 s), even with the same node count. Build a profile
@@ -266,7 +279,7 @@ def stokes_kernels(profile: RadialProfile, config: StokesConfig) -> Kernels:
       PREM with density jumps, a smooth viscosity at every node, layered and uniform
       densities; degrees 1 to 200), 3.1e-13 in the raw frame at ``l = 1`` on a split
       core. The error of the raw frame grows as the raw system approaches the singular
-      case (a consistent core, eq. 10a): on two four-node tables with a pair at the CMB
+      case (a consistent core, eq. 10(a)): on two four-node tables with a pair at the CMB
       or at the surface it reached 1.2e-11 and 2.5e-12 (geoid), so the stated number
       holds for the stored tables;
     - values under the flags (NO_SELF_GRAVITY, a uniform background, TALA, no slip at
@@ -289,8 +302,8 @@ def stokes_kernels(profile: RadialProfile, config: StokesConfig) -> Kernels:
       without growth with the viscosity of the lid; with an independent viscosity at
       every node over eight decades (neighbour ratios up to 1.0e7) 1.3e-14. A prior that
       allows larger neighbour ratios is outside the range measured with this package
-      (the prototypes of NOTES/chunks/c2-forward-core/01-plan.md measured 7.4e-12 at twelve decades with neighbour
-      ratios up to 8.9e10). At ``l = 1200`` (hager4) 7.9e-15; the rows of the highest
+      (the prototypes of the solver measured 7.4e-12 at twelve decades with neighbour
+      ratios up to 8.9e10; NOTES/chunks/c2-forward-core/01-plan.md). At ``l = 1200`` (hager4) 7.9e-15; the rows of the highest
       degrees hold exact zeros (and next to them a few subnormal numbers) at the few
       sources farthest from the boundary of the
       output (4 to 7 of 135 at ``l = 1200``), where the physical kernel is below the
@@ -306,7 +319,7 @@ def stokes_kernels(profile: RadialProfile, config: StokesConfig) -> Kernels:
       the direction (2.2e-12 on the 1e25 Pa s lid along a second direction): the
       derivative of a kernel row along a direction can be much smaller than the
       sensitivity of the row, and the metric divides by it. Under the flags the Taylor
-      tests of CONVENTIONS 8 (second order for both direction signs in both modes) pass
+      tests (second order for both direction signs in both modes; CONVENTIONS 8) pass
       for ``log eta``, ``rho0`` and the radius together in all 32 combinations, and the
       jvp/vjp dot products agree to 1e-14 relative (TALA with the closed-form pair step,
       NO_SELF_GRAVITY with a uniform background, no slip at both boundaries).

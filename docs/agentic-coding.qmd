@@ -1,0 +1,48 @@
+---
+title: "Agentic coding"
+---
+
+Agentic coding tools wrote this software. This page states what the tools wrote, what the
+author decided, and which checks the result must pass.
+
+## What the tools wrote
+
+Agentic coding tools wrote the implementation: the solver, the controls, the derivatives,
+the tests, the examples and this documentation. The author directed the work and reviewed
+it. The physics and the method are not new. They come from CODE-A and from the papers on
+[the home page](index.qmd).
+
+## What the author decided
+
+The author gave 26 numbered rulings. They set the scope: what is ported and what is not.
+They set the physics: self-consistent gravity, the compressibility and gravity flags, free
+slip or no slip, and density jumps as phase changes. They also set the conventions (those
+of lovejx), the default motion of the movable boundaries, how the tests run, and the form
+of this documentation and its deployment. The tools proposed the other design defaults and every tolerance. One
+ruling accepts the defaults of the open questions of the chunk plans that it names. The
+questions that no ruling decides keep the default of the package. [The open
+points](open-points.qmd) list those that change what a user sees.
+
+## How the tolerances were set
+
+Each tolerance states its cause next to its value in the test code. When a planned
+tolerance did not hold, the tools loosened it only with an entry in the tolerance log of
+the author's working notes. The entry holds the old value, the new value, the measured
+value and the cause. For example, the bound of the derivative on the stiff-lid case
+against the high-precision solver went from 1e-12 to 1e-10. The package measured 9.7e-12
+in forward mode and 1.6e-11 in reverse mode. The cause is the rounding on the thin stiff lid.
+
+## What checks the result
+
+- Separate review agents checked each plan and each implementation.
+- Two references are not the work of a tool: the Fortran golden output of CODE-A (under
+  CODE-A's own switches), and the analytical solutions of Kramer, Davies and Wilson (2021)
+  through `assess`.
+- The mpmath solver is a second solver, which the tools wrote from the same equations
+  with another algorithm and another arithmetic.
+- The Taylor policy has negative controls, and a measurement that the rounding hides is
+  not a pass.
+- One test run holds every check.
+
+[The validation page](validation.qmd) gives the detail, and [the open
+points](open-points.qmd) state what is not checked yet.

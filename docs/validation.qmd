@@ -1,0 +1,96 @@
+---
+title: "Validation"
+---
+
+`stokesjx` is compared with three independent references: the Fortran code CODE-A, a
+second solver in high-precision arithmetic, and analytical solutions. The derivatives are
+checked by Taylor tests and dot products. For each reference, the bound of the test
+comes first and the measured agreement second.
+
+## The error metric
+
+The values are compared with the metric `e_l`: per degree, the largest difference over
+the source nodes divided by the largest reference value.
+
+## Fortran CODE-A
+
+The golden output of CODE-A comes from runs under CODE-A's own switches. These switches
+are a uniform gravity of 10 m/s², the material of an interval at its upper node, and
+equal weights of the radial integral. `stokesjx` reproduces these switches in a test-only mode of its low
+layer. The golden data is a reduced, checksummed set in `tests/golden/`. The Fortran
+itself is not distributed.
+
+| Case | Bound | Measured |
+|---|---|---|
+| isoviscous, all 50 degrees | `1e-12` | 2.6e-14 |
+| hager4 viscosity | `1e-12` | 2.7e-14 |
+| smooth viscosity | `1e-12` | 1.8e-13 |
+| TALA and no slip | `1e-12` | at most 3.0e-13 |
+
+## The mpmath reference
+
+A second solver computes the kernels at 50 to 250 digits with mpmath
+(`tests/reference_mpmath.py`). It uses the single product of the propagators, the
+algorithm that needs high precision, and not the sweeps of the package. The agentic coding
+tools wrote it from the same equations as the package. It is independent in its algorithm
+and its arithmetic, not in its authorship. The references that no tool wrote are the
+CODE-A output and the analytical solutions of Kramer, Davies and Wilson (2021).
+
+| Case | Bound | Measured |
+|---|---|---|
+| moderate cases, degrees 1 to 200 | `1e-12` | at most 8.5e-14 |
+| raw frame at `l = 1` (split core) | `1e-12` | 3.1e-13 |
+| stiff lid and ten decades of viscosity | `1e-11` | 1.2e-12 (stiff lid, at `l = 1`), 3.6e-13 (ten decades) |
+| 32 flag combinations | `1e-12` | at most 4.6e-13 |
+| the viscosity cut | `1e-12` | at most 1e-13 (2e-14 typical) |
+
+## Analytical solutions
+
+The reference is the analytical solutions of Kramer, Davies and Wilson (2021) through the
+package `assess`. They cover an isoviscous shell, delta and smooth forcing, free slip and
+no slip, with a uniform gravity and no self-gravitation. Bound `1e-12`, measured 1.2e-14.
+
+## Derivatives
+
+Every Taylor case passes the policy of [the derivatives page](gradients.qmd#taylor-tests),
+with both signs and both modes, and every negative control fails. The two Taylor cases of
+the integration tests have the corrected rates 1.997 and 2.000. The jvp/vjp dot products
+agree to `1e-12` (1e-14 typical).
+
+## Errors of CODE-A that stokesjx fixes
+
+| CODE-A | stokesjx |
+|---|---|
+| `grav()` returns 10 m/s² everywhere. | The gravity is integrated from `rho0` and the core mass. A uniform `g` is a flag. |
+| The free-air kernel uses `G M / R^2`, everything else 10 m/s². | The gravity anomaly comes from the geoid and the surface `g` of the profile. |
+| The viscosity and the density of a layer are those of its upper node. | The material of an interval is the mean of its two nodes. A jump is a node pair. |
+| The radial integral gives every node the same weight. | The trapezoid weights of the node table. |
+| The degree-1 geoid kernel is set to zero; the other degree-1 kernels are not. | Degree 1 is in the centre-of-mass frame for all outputs. |
+| The Sylvester formula removes close eigenvalues; 128-bit reals for one product of propagators. | Exact interval exponentials and two orthonormalised sweeps per degree, stable in float64 at every degree. |
+| The admittance kernel is a ratio of two kernels. | The admittance comes from the field coefficients. |
+| The `SPHCO` header says "Cnm, Snm(m<0)", but each line holds C and then S. | The readers parse the data order. |
+| The compressible term is a one-sided difference of `rho0`. | The TALA term comes from the same interval data as the rest. |
+
+## Where the tests run
+
+One test run checks every reference: `python -m pytest -n 8` runs every test. On the
+author's machine every test runs: 1101 tests pass in 339 s.
+
+The CI job on the self-hosted runners of the repository runs every test that needs
+neither `legacy/` nor lovejx. It skips 25 tests:
+
+- 12 tests that need the Fortran reference (`legacy/`, not distributed);
+- the 13 tests that compare with lovejx: 10 tests of `stokesjx.sh` against
+  `lovejx.sealevel.sht` and 3 tests of the background gravity against lovejx. CI does
+  not install lovejx, because lovejx is not on PyPI and its repository is not public
+  yet.
+
+The other tests of `stokesjx.sh` run in CI. They check the conventions against scipy and
+against the formula of CODE-A, the Gauss-Legendre round trip, the conversions and the
+degree power.
+
+## What the comparison does not establish
+
+The comparison with CODE-A uses CODE-A's own discrete model. It checks the solver, not
+the choice of the model. The comparisons against published values are not done yet
+([open points](open-points.qmd)).

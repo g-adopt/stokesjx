@@ -77,7 +77,10 @@ def _interp_d4(x, x0, x1, f0, f1):
 class MovableRange:
     """Static description of one movable boundary of a ``Layers``. Host numpy only.
 
-    Attributes
+    ``Layers`` builds one record per movable boundary (``Layers.ranges``); the fields below
+    are its constructor parameters and its attributes.
+
+    Parameters
     ----------
     index
         The boundary index in ``Layers.boundaries``.
@@ -135,8 +138,14 @@ class Layers:
 
     traceable in every argument, so that ``jax.grad`` of a misfit gives the derivative
     with respect to the layer viscosities, the radii of the movable boundaries and the
-    reference density. It follows lovejx ``Layers`` (ruling 3) with the differences of
-    NOTES/chunks/c4-controls-derivatives/01-plan.md D1.
+    reference density. It follows lovejx ``Layers`` (ruling 3), with differences that
+    the physics of this package requires: the boundary vector runs from the CMB to the
+    surface (there is no elastic lid), the call returns one ``RadialProfile`` (the
+    profile carries ``eta``, so there is no separate rheology), there is no relaxed
+    layer and no Kelvin element, ``rho0`` can be a control, a density anomaly stays on
+    the input table, and a movable boundary is by default a viscosity cut that can
+    cross the density jumps of the table (NOTES/chunks/c4-controls-derivatives/01-plan.md
+    D1; rulings 14 and 17).
 
     **The layering.** ``boundaries`` are radii in m, strictly ascending, from the CMB to
     the surface: ``boundaries[0]`` must be the CMB radius of the profile and
@@ -167,8 +176,8 @@ class Layers:
     the default for three reasons. Under an incompressible formulation its derivative
     with respect to the radius has no kinks: on the tables T1 (137-node PREM table, range
     (5060.5, 5700) km, ``lmax = 50``) and T2 (257-node refined table, range (5466.9, 5970)
-    km, ``lmax = 100``) of ``benchmarks/measure_kink.py``, ``E_rms`` (below, "Measured
-    kinks of the affine method") is at most 1.2e-11 nat for the smooth and the LEBEDEV
+    km, ``lmax = 100``) of ``NOTES/benchmarks/scripts/measure_kink.py``, ``E_rms`` (below,
+    "Measured kinks of the affine method") is at most 1.2e-11 nat for the smooth and the LEBEDEV
     anomaly and 7.6e-11 nat for the rough anomaly, against 0.103 and 0.137 nat for the
     affine method, and the relative jump of the derivative is at most 3.2e-11
     (NOTES/benchmarks/c6-kink-default.json). On the 137-node PREM table the cut is within
@@ -244,7 +253,13 @@ class Layers:
 
     Derivative of the cut: under an incompressible formulation the map from ``c`` to every
     output is continuously differentiable everywhere, also where the cut crosses an
-    input node or a density pair (proof in NOTES/docs/equations.md section 19.3). The map
+    input node or a density pair. The derivative of the chain of steps with respect to
+    ``c`` holds the factor ``(A(e_lo) - A(e_hi)) / c``. This factor does not depend on the
+    interval density (the density enters only the entries (3,6) and (4,5) of ``A``, which
+    the viscosity similarity leaves unchanged), so it is the same matrix on both sides of
+    a node; it maps the jump vector of a source node, which has entries in rows 3 and 6
+    only, to zero; and a density pair is a step equal to the identity
+    (NOTES/docs/equations.md section 19.3). The map
     is not twice continuously differentiable: its second derivative jumps where the cut
     crosses any input node (the second derivative of the kernel of the crossed node
     holds ``(A(e_lo) - A(e_hi)) A J``, which is not zero; the interval density adds a
@@ -266,7 +281,7 @@ class Layers:
     (``profile.structure.limits`` is ``None``, ``width_factor`` is 1, ``pade_plan`` is the
     plan of the construction table) and is as fast as the affine method (0.95 and 1.00 of
     its gradient run time and 0.92 of its gradient compile time at S1 and S2 of
-    ``benchmarks/bench_controls.py``; NOTES/benchmarks.md).
+    ``NOTES/benchmarks/scripts/bench_controls.py``; NOTES/benchmarks.md).
 
     **TALA and a density jump inside a range.** Under TALA the kernels jump when a cut
     crosses a pair with a density jump: the TALA step of the pair (eq. 12.3) takes the
@@ -379,9 +394,9 @@ class Layers:
     ``s = (r - low) / (r0 - low)`` with small denominators when the input radii below the
     boundary are equally spaced from the range end; ``r0`` is the group ``s = 1``, and
     the largest is ``s = 2``, which lies inside the range when ``r0`` is closer to that
-    range end than to the other. The measured kink sizes and the HMC energy estimate are
-    in NOTES/chunks/c4-controls-derivatives/03-implementation.md section 5 (summary
-    below, "Measured kinks").
+    range end than to the other. The paragraph "Measured kinks of the affine method"
+    below gives the measured kink sizes and the HMC energy estimate
+    (NOTES/chunks/c4-controls-derivatives/03-implementation.md section 5).
 
     **Static limits and the Pade cost (affine method).** The Pade order and squaring count of the
     interval exponentials are static. A moved node widens the intervals on one side of
@@ -396,7 +411,9 @@ class Layers:
 
     **Density anomalies (fields).** A density anomaly is a function of the radius given
     on the INPUT table (the nodes of the profile given to the constructor), radial axis
-    first, in the layout of CONVENTIONS 15. A boundary that moves does not move it. The
+    first, with the degree and order axes last under the layout rule of
+    ``stokesjx.sh`` (``sh.check_layout``; CONVENTIONS 15). A boundary that moves does not
+    move it. The
     field is the trapezoid rule of the input table,
 
         F_o[l, m] = sum_i K_o[l](r_i) w_i drho[i, l, m],
@@ -439,8 +456,9 @@ class Layers:
     degree in the middle of a deep range, 2e-2 to 4e-2 where the nodes of one side are
     stretched by about 2). The cause and the remedy are those of the kinks below.
 
-    **Measured kinks of the affine method** (``benchmarks/measure_kink.py``, NOTES/benchmarks/c4-kink.json and
-    c4-kink-t2s.json; NOTES/chunks/c4-controls-derivatives/03-implementation.md section 5).
+    **Measured kinks of the affine method** (``NOTES/benchmarks/scripts/measure_kink.py``,
+    NOTES/benchmarks/c4-kink.json and c4-kink-t2s.json;
+    NOTES/chunks/c4-controls-derivatives/03-implementation.md section 5).
     The size of a kink is ``rho``, the jump of the derivative of the geoid field over the
     derivative; crossings closer than 1 m are one group with one total jump. With a
     Gaussian geoid likelihood whose posterior standard deviation of the radius is
@@ -530,6 +548,13 @@ class Layers:
     table_nodes
         Construction indices of the knots of the ``rho0`` table, ascending (every node
         under ``"cut"``, where no node moves).
+    n_layers
+        The number of layers, ``B - 1``.
+    width_factor
+        The largest ratio of the width limit of an interval to its construction width:
+        1.0 without a movable boundary and under ``"cut"``; under ``"affine"`` a large
+        factor costs squarings (put the construction radius near the middle of its
+        range).
 
     Raises
     ------
@@ -918,9 +943,15 @@ class Layers:
         ``r = low + (r_k - low) (r0 - low) / (r_j - low)``; a node above at
         ``r = high - (high - r_k) (high - r0) / (high - r_j)``.
 
+        Parameters
+        ----------
+        index
+            The boundary index of a movable boundary (a key of ``ranges``).
+
         Returns
         -------
-        ``(radii, kinds)``: ``(C,)`` float64 in m and ``(C,)`` int.
+        tuple of numpy arrays
+            ``(radii, kinds)``: ``(C,)`` float64 in m and ``(C,)`` int.
         """
         g = self.ranges[int(index)]
         r_in = self._r_in
@@ -1017,7 +1048,13 @@ class Layers:
 
     def pade_plan(self, config: StokesConfig):
         """The static Pade plan of the interval exponentials for ``config``
-        (``propagate.static_plan`` of the construction structure, with its limits)."""
+        (``propagate.static_plan`` of the construction structure, with its limits).
+
+        Parameters
+        ----------
+        config
+            The ``StokesConfig`` of the kernels.
+        """
         from . import propagate
         return propagate.static_plan(self.profile.structure, config).pade
 
@@ -1216,9 +1253,14 @@ class Layers:
 
         Returns
         -------
-        ``Kernels`` with every kernel ``(L, N_in)``, ``degree_one_imbalance`` ``(N_in,)``
-        mapped with the same weights, ``radius`` the static input radius, and the
-        degrees and the frame of the input. Under ``"cut"`` (the default) and without a
+        Kernels
+            Every kernel ``(L, N_in)``, ``degree_one_imbalance`` ``(N_in,)`` mapped with
+            the same weights, ``radius`` the static input radius, and the degrees and the
+            frame of the input.
+
+        Notes
+        -----
+        Under ``"cut"`` (the default) and without a
         movable boundary every input node takes the kernel of its construction node.
         Under ``"affine"`` an input node outside every movable range (the range ends
         included) does the same, and an input node strictly inside a range takes the
@@ -1255,10 +1297,18 @@ class Layers:
         """The four fields of a density anomaly given on the input table (plan D11):
         ``fields.apply(self.input_kernels(kernels), density, self.input_profile)``.
 
-        ``density`` is ``(N_in, *batch, Ld+1, Ld+1)`` in kg/m^3 (CONVENTIONS 15), with the
-        radii of ``input_profile``; a first axis that is not ``N_in`` raises
-        ``ValueError``. A boundary that moves does not move the anomaly. Pass the density
-        to a jitted function as an argument (``fields.apply``, compile time)."""
+        A boundary that moves does not move the anomaly. Pass the density to a jitted
+        function as an argument (``fields.apply``, compile time).
+
+        Parameters
+        ----------
+        kernels
+            ``Kernels`` of a profile of this ``Layers``.
+        density
+            ``(N_in, *batch, Ld+1, Ld+1)`` in kg/m^3 under the layout rule of
+            ``stokesjx.sh`` (CONVENTIONS 15), with the radii of ``input_profile``; a first
+            axis that is not ``N_in`` raises ``ValueError``.
+        """
         return _apply_fields(self.input_kernels(kernels), density, self.input_profile)
 
     def sheet_mass(self, density, kernels: Kernels) -> jax.Array:
@@ -1273,7 +1323,16 @@ class Layers:
         current radius is read from ``kernels.radius``). ``fields.radial_integral(kernels, sheet_mass, ones(N))``
         equals ``self.fields(kernels, density)`` to rounding. It costs ``O(N L^2)`` per
         batch entry against ``O(4 L N_in)`` of ``input_kernels``; use it for a density on
-        the construction table and for the adjoint test of the map."""
+        the construction table and for the adjoint test of the map.
+
+        Parameters
+        ----------
+        density
+            ``(N_in, *batch, Ld+1, Ld+1)`` in kg/m^3 on the input table.
+        kernels
+            ``Kernels`` of a profile of this ``Layers``: the current radius is read from
+            ``kernels.radius``.
+        """
         d = jnp.asarray(density)
         if d.ndim < 3 or d.shape[0] != self._r_in.size:
             raise ValueError(f"the density has the radial axis first on the input table, (N_in, ..., Ld+1, Ld+1) "
@@ -1303,8 +1362,9 @@ class Layers:
 class NodeViscosity:
     """A control map from one natural-log viscosity per node to a profile. Built by
     ``viscosity_by_node``. A callable, not a pytree; a jitted misfit closes over it.
+    The call ``nv(log_eta)`` returns ``profile.replace(eta=exp(log_eta))``.
 
-    Attributes
+    Parameters
     ----------
     profile
         The concrete template profile; every other leaf is kept.
@@ -1334,7 +1394,18 @@ def viscosity_by_node(profile: RadialProfile) -> NodeViscosity:
 
     Every node is a control: the instantaneous Stokes problem has no elastic lid and no
     core node, and each node of a pair is its own control. The node table does not move,
-    so a density on this table goes to ``fields.apply`` with the profile itself."""
+    so a density on this table goes to ``fields.apply`` with the profile itself.
+
+    Parameters
+    ----------
+    profile
+        A concrete ``RadialProfile`` (a traced ``eta`` raises ``ValueError``).
+
+    Returns
+    -------
+    NodeViscosity
+        The map ``log_eta (N,) -> RadialProfile``.
+    """
     if not isinstance(profile, RadialProfile):
         raise ValueError(f"viscosity_by_node takes a RadialProfile, got {type(profile).__name__}")
     if _is_traced(profile.eta):
@@ -1428,6 +1499,19 @@ class ControlVector:
     ``Layers.radius_bounds`` the radius derivative is exactly zero, so the prior must
     have its support inside these bounds; the derivative with respect to a movable
     radius has jumps at the crossings documented in ``Layers``.
+
+    Parameters
+    ----------
+    example
+        A pytree of float64 arrays that fixes the structure and the shapes of the
+        controls; another dtype raises ``TypeError``.
+
+    Attributes
+    ----------
+    size
+        The length of the control vector.
+    names
+        One name per entry of the vector (the pytree path and the index of the entry).
     """
 
     def __init__(self, example):
@@ -1451,21 +1535,40 @@ class ControlVector:
         self._cache: dict = {}
 
     def ravel(self, controls) -> jax.Array:
-        """The ``(size,)`` vector of a controls pytree of the example's structure."""
+        """The ``(size,)`` vector of a controls pytree of the example's structure.
+
+        Parameters
+        ----------
+        controls
+            A pytree of the structure and the shapes of the example.
+        """
         flat, _ = jax.flatten_util.ravel_pytree(controls)
         if flat.shape != (self.size,):
             raise ValueError(f"the controls have {flat.size} entries, the example {self.size}")
         return flat
 
     def unravel(self, vector):
-        """The controls pytree of a ``(size,)`` vector."""
+        """The controls pytree of a ``(size,)`` vector.
+
+        Parameters
+        ----------
+        vector
+            ``(size,)`` float64.
+        """
         v = jnp.asarray(vector, dtype=jnp.float64)
         if v.shape != (self.size,):
             raise ValueError(f"the control vector must have the shape ({self.size},), got {v.shape}")
         return self._unravel(v)
 
     def value_and_grad(self, fn: Callable) -> Callable:
-        """Jitted ``(vector, *data) -> (scalar, (size,) gradient)`` of ``fn(controls, *data)``."""
+        """Jitted ``(vector, *data) -> (scalar, (size,) gradient)`` of ``fn(controls, *data)``.
+
+        Parameters
+        ----------
+        fn
+            The user's scalar function ``fn(controls, *data)``; keep one function object
+            (the cache key is its identity).
+        """
         key = (fn, "value_and_grad")
         if key not in self._cache:
             unravel = self._unravel
@@ -1476,7 +1579,14 @@ class ControlVector:
         return self._cache[key]
 
     def value(self, fn: Callable) -> Callable:
-        """Jitted ``(vector, *data) -> scalar`` of ``fn(controls, *data)``."""
+        """Jitted ``(vector, *data) -> scalar`` of ``fn(controls, *data)``.
+
+        Parameters
+        ----------
+        fn
+            The user's scalar function ``fn(controls, *data)``; keep one function object
+            (the cache key is its identity).
+        """
         key = (fn, "value")
         if key not in self._cache:
             unravel = self._unravel
@@ -1487,9 +1597,27 @@ class ControlVector:
         """``np (size,) -> (float, np.ndarray)``: the value and the gradient of
         ``fn(controls, *data)`` for samplers and optimisers outside JAX (for example
         ``scipy.optimize.minimize(f, x0, jac=True)``). The data are bound as device arrays
-        and passed to the cached compiled function as arguments."""
+        and passed to the cached compiled function as arguments.
+
+        Parameters
+        ----------
+        fn
+            The user's scalar function ``fn(controls, *data)``; keep one function object
+            (the cache key is its identity).
+        data
+            The arguments after the controls, bound as device arrays.
+        """
         return _NumpyFunction(self.value_and_grad(fn), self.size, data, gradient=True)
 
     def numpy_value(self, fn: Callable, *data) -> _NumpyFunction:
-        """``np (size,) -> float``: the value of ``fn(controls, *data)``."""
+        """``np (size,) -> float``: the value of ``fn(controls, *data)``.
+
+        Parameters
+        ----------
+        fn
+            The user's scalar function ``fn(controls, *data)``; keep one function object
+            (the cache key is its identity).
+        data
+            The arguments after the controls, bound as device arrays.
+        """
         return _NumpyFunction(self.value(fn), self.size, data, gradient=False)

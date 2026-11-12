@@ -79,10 +79,6 @@ _REAL = ("real_4pi", "real_orthonormal")
 def gauss_legendre(nlat: int) -> tuple[np.ndarray, np.ndarray]:
     """Gauss-Legendre nodes and weights, north to south (port of lovejx).
 
-    Returns ``(x, w)`` with ``x = sin(latitude) = cos(colatitude)`` in decreasing order,
-    so that index 0 is the ring nearest the north pole. The weights sum to 2 and
-    integrate polynomials of degree up to ``2 nlat - 1`` exactly.
-
     The nodes are the zeros of ``P_nlat``, polished by two Newton steps on the
     three-term recursion from numpy's nodes, and the weights are
     ``2 / ((1 - x^2) P_nlat'(x)^2)`` evaluated at the polished node (the Numerical
@@ -91,6 +87,19 @@ def gauss_legendre(nlat: int) -> tuple[np.ndarray, np.ndarray]:
     only to about 5e-13 relative, which shows up as quadrature noise of 6e-14 in the
     coefficients of a constant field at degree 200; with node-consistent weights the
     noise is 4e-15.
+
+    Parameters
+    ----------
+    nlat
+        Number of latitude rings (nodes).
+
+    Returns
+    -------
+    tuple of numpy arrays
+        ``(x, w)``, each ``(nlat,)``, float64: ``x = sin(latitude) = cos(colatitude)`` in
+        decreasing order, so that index 0 is the ring nearest the north pole, and the
+        weights, which sum to 2 and integrate polynomials of degree up to
+        ``2 nlat - 1`` exactly.
     """
     n = nlat
     x = np.polynomial.legendre.leggauss(n)[0]
@@ -124,9 +133,12 @@ def legendre_table(lmax: int, x) -> np.ndarray:
 
     Returns
     -------
-    float64 numpy array ``(L+1, L+1, n)``: ``plm[l, m, j] = Pbar_lm(x_j)``, exactly zero
-    for ``m > l``.
+    numpy.ndarray
+        ``(L+1, L+1, n)``, float64: ``plm[l, m, j] = Pbar_lm(x_j)``, exactly zero for
+        ``m > l``.
 
+    Notes
+    -----
     The recursion is Whitaker's, with ``eps_lm = sqrt((l^2 - m^2) / (4 l^2 - 1))``:
 
         Pbar_(m+1, m) = sqrt(2m+3) x Pbar_mm
@@ -175,7 +187,12 @@ class GaussLegendreGrid:
     lovejx class without its ``legacy_sqrt2`` switch). A JAX pytree: the arrays are
     leaves, the sizes static.
 
-    Attributes
+    Fields on the grid are ``(nlat, nlon)``: latitude ring ``j`` (north to south) and
+    longitude ``i``. On an even grid with ``L = nlon / 2`` the column ``m = nlon / 2`` is
+    the Nyquist order, whose sine part the grid cannot carry; with ``nlon >= 2 L + 1``
+    every order is exact. ``build`` makes a grid from its sizes.
+
+    Parameters
     ----------
     nlat, nlon, ntrunc
         Grid size and triangular truncation ``L <= nlon // 2``.
@@ -188,10 +205,12 @@ class GaussLegendreGrid:
     plm
         ``Pbar_lm(x_j)``, ``(L+1, L+1, nlat)``.
 
-    Fields on the grid are ``(nlat, nlon)``: latitude ring ``j`` (north to south) and
-    longitude ``i``. On an even grid with ``L = nlon / 2`` the column ``m = nlon / 2`` is
-    the Nyquist order, whose sine part the grid cannot carry; with ``nlon >= 2 L + 1``
-    every order is exact.
+    Attributes
+    ----------
+    latitude_deg
+        Latitude of each ring in degrees, north to south.
+    longitude_deg
+        Longitude of each column in degrees east of Greenwich.
     """
 
     nlat: int
@@ -204,9 +223,18 @@ class GaussLegendreGrid:
 
     @classmethod
     def build(cls, nlat: int, nlon: int, ntrunc: int) -> "GaussLegendreGrid":
-        """Construct the grid and its Legendre table. Raises ``ValueError`` for
-        ``ntrunc > nlon // 2`` (the largest order that a real FFT of ``nlon`` points
-        carries)."""
+        """Construct the grid and its Legendre table.
+
+        Parameters
+        ----------
+        nlat
+            Number of latitude rings (Gauss-Legendre nodes).
+        nlon
+            Number of longitudes, equally spaced from Greenwich.
+        ntrunc
+            Triangular truncation ``L``, at most ``nlon // 2`` (the largest order that a
+            real FFT of ``nlon`` points carries); a larger value raises ``ValueError``.
+        """
         if ntrunc > nlon // 2:
             raise ValueError("ntrunc must not exceed nlon // 2")
         x, w = gauss_legendre(nlat)
@@ -265,6 +293,14 @@ def synthesis(grid: GaussLegendreGrid, U) -> jax.Array:
     of ``U_l0`` and, on an even grid with ``L = nlon / 2``, of the Nyquist column are set to
     zero explicitly (the grid cannot carry them), so that the value and the gradient do
     not depend on the FFT backend.
+
+    Parameters
+    ----------
+    grid
+        ``GaussLegendreGrid`` (latitude nodes, the Legendre table, ``nlon`` and the
+        truncation ``ntrunc = L``).
+    U
+        ``(L+1, L+1)`` ``complex_4pi`` coefficients.
     """
     L, nlat, nlon = grid.ntrunc, grid.nlat, grid.nlon
     U = jnp.asarray(U)
@@ -338,11 +374,12 @@ def convert(coefficients, source: str, target: str, *, units: Units | None = Non
 
     Returns
     -------
-    The coefficients in ``target``: ``U_l0 = C_l0``, ``U_lm = (C_lm - i S_lm) / sqrt(2)``
-    (real to complex, complex128), ``C_l0 = Re U_l0``, ``S_l0 = 0``,
-    ``C_lm = sqrt(2) Re U_lm``, ``S_lm = -sqrt(2) Im U_lm`` (complex to real, float64), and
-    the factor ``sqrt(4 pi)`` between the two real conventions. A linear map, valid under
-    ``jit``, ``grad`` and ``vmap``.
+    jax.Array
+        The coefficients in ``target``: ``U_l0 = C_l0``, ``U_lm = (C_lm - i S_lm) /
+        sqrt(2)`` (real to complex, complex128), ``C_l0 = Re U_l0``, ``S_l0 = 0``,
+        ``C_lm = sqrt(2) Re U_lm``, ``S_lm = -sqrt(2) Im U_lm`` (complex to real,
+        float64), and the factor ``sqrt(4 pi)`` between the two real conventions. A
+        linear map, valid under ``jit``, ``grad`` and ``vmap``.
     """
     check_layout(coefficients, source)
     if target not in CONVENTIONS:
@@ -397,9 +434,12 @@ def synthesis_grid(coefficients, convention: str, latitude_deg, longitude_deg, *
 
     Returns
     -------
-    ``(..., nlat, nlon)``: ``f = sum_lm (C_lm cos(m lambda) + S_lm sin(m lambda)) sqrt(2 - delta_m0) Pbar_lm``
-    with the ``real_4pi`` coefficients.
+    jax.Array
+        ``(..., nlat, nlon)``: ``f = sum_lm (C_lm cos(m lambda) + S_lm sin(m lambda))
+        sqrt(2 - delta_m0) Pbar_lm`` with the ``real_4pi`` coefficients.
 
+    Notes
+    -----
     Method: the coefficients are converted to ``real_4pi`` and multiplied by
     ``sqrt(2 - delta_m0)``; the table ``Pbar_lm`` at the static latitudes comes from the
     host (cached); ``a = einsum("...lm,lmi->...im", C, P)``, ``b`` the same for ``S``, and
@@ -430,6 +470,13 @@ def degree_power(x, y, convention: str) -> jax.Array:
     ``complex_4pi`` this is the degree power of the mean over the sphere, so the two
     agree; ``real_orthonormal`` gives ``4 pi`` times it. Both inputs follow the layout
     rule for the convention and have the same shape; the batch axes are kept.
+
+    Parameters
+    ----------
+    x, y
+        Coefficient arrays of one shape under the layout rule for ``convention``.
+    convention
+        A name from ``CONVENTIONS``.
     """
     check_layout(x, convention)
     check_layout(y, convention)

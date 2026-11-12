@@ -64,7 +64,11 @@ class Fields:
     """The four fields of a density anomaly. A JAX pytree: the arrays are leaves,
     ``degrees`` is static. Equality is identity (``eq=False``), as for ``Kernels``.
 
-    Attributes
+    Each field has the convention and the batch axes of the density. ``apply`` and
+    ``radial_integral`` build the record; the fields below are its constructor
+    parameters and its attributes.
+
+    Parameters
     ----------
     degrees
         ``Kernels.degrees``: the degree rows that are not zero by construction. The rows
@@ -78,8 +82,6 @@ class Fields:
     surface_velocity
         Same shape, m/s: the coefficients whose degree power is the mean square of the
         horizontal surface speed (eq. 9.4; zero under a no-slip surface).
-
-    Each field has the convention and the batch axes of the density.
     """
 
     degrees: tuple[int, ...]
@@ -147,8 +149,11 @@ def radial_integral(kernels: Kernels, density, weights) -> Fields:
 
     Returns
     -------
-    ``Fields`` with each array ``(*batch, lmax+1, lmax+1)``.
+    Fields
+        Each array ``(*batch, lmax+1, lmax+1)``.
 
+    Notes
+    -----
     Method: the weights go into the stacked kernels first, ``Kw = K w`` ``(4, L, N)``, the
     density is cut statically to the kernel degrees and to ``lmax + 1`` orders,
     ``rows = density[..., d0:lmax+1, :lmax+1]``, and one einsum
@@ -179,8 +184,8 @@ def apply(kernels: Kernels, density, profile: RadialProfile) -> Fields:
     are concrete, ``kernels.radius`` must equal ``profile.radius`` (``ValueError``): a
     profile with the same node count and other radii would give wrong weights.
 
-    The density rule (NOTES/chunks/c4-controls-derivatives/01-plan.md D11). The density
-    is given on the node table of ``profile``. For a ``controls.Layers`` with movable
+    The density rule: the density is given on the node table of ``profile``
+    (NOTES/chunks/c4-controls-derivatives/01-plan.md D11). For a ``controls.Layers`` with movable
     boundaries the density of a field is given on the INPUT table of the ``Layers`` and
     does not move with a boundary; that field is ``Layers.fields(kernels, density)``.
     This function refuses the profile of a ``Layers`` with a movable boundary under
@@ -194,17 +199,35 @@ def apply(kernels: Kernels, density, profile: RadialProfile) -> Fields:
     explicit weights does not check: a caller who passes weights takes the
     responsibility.
 
-    Example::
-
-        K = stokes_kernels(profile, config)
-        F = apply(K, density, profile)       # density (N, 2, L+1, L+1), real_4pi
-        F.geoid                              # (2, lmax+1, lmax+1), m
-
     Compile time: pass the density to a jitted function as an argument. A density that
     the function closes over is embedded as a constant of the program (42 MB for 257
     nodes and ``L = 100``), and XLA then needs about 0.3 s more to compile the misfit and
     its gradient; as an argument the field map adds 0.01 to 0.03 s
     (NOTES/chunks/c3-flags-fields/impl-evidence/density_constant.out).
+
+    Parameters
+    ----------
+    kernels
+        ``Kernels`` of ``profile`` (each kernel ``(L, N)``, contiguous degrees).
+    density
+        ``(N, *batch, Ld+1, Ld+1)``, kg/m^3, on the node table of ``profile``, CMB
+        first, ``Ld >= lmax``, under the layout rule of ``stokesjx.sh``
+        (``radial_integral``).
+    profile
+        The ``RadialProfile`` of the kernels: its radius sets the trapezoid weights.
+
+    Returns
+    -------
+    Fields
+        Each array ``(*batch, lmax+1, lmax+1)``, in the convention of ``density``.
+
+    Examples
+    --------
+    ::
+
+        K = stokes_kernels(profile, config)
+        F = apply(K, density, profile)       # density (N, 2, L+1, L+1), real_4pi
+        F.geoid                              # (2, lmax+1, lmax+1), m
     """
     if profile.structure.limits is not None:
         raise ValueError("the density of a movable Layers profile is given on the input table and does not "
@@ -235,7 +258,7 @@ def spectral_misfit(field, observed, weights, convention: str) -> jax.Array:
     ----------
     field, observed
         Coefficient arrays of one shape under the layout rule of ``convention``
-        (CONVENTIONS 15), batch axes allowed (summed).
+        (``sh.check_layout``), batch axes allowed (summed).
     weights
         ``(L + 1,)`` float64, one weight per degree of the arrays; another length
         raises ``ValueError``.
@@ -244,8 +267,9 @@ def spectral_misfit(field, observed, weights, convention: str) -> jax.Array:
 
     Returns
     -------
-    A scalar. No square root is taken, so the derivative is finite at ``d = 0``: with
-    respect to ``field`` it is ``2 w_l d`` in ``real_4pi``.
+    jax.Array
+        A scalar. No square root is taken, so the derivative is finite at ``d = 0``:
+        with respect to ``field`` it is ``2 w_l d`` in ``real_4pi``.
     """
     d = jnp.asarray(field) - jnp.asarray(observed)
     S = sh.degree_power(d, d, convention)                                 # (..., L+1)
@@ -307,7 +331,8 @@ def gravity_anomaly(geoid, g_surface, radius, degrees=None) -> jax.Array:
 
     Returns
     -------
-    An array of the shape (and convention) of ``geoid``.
+    jax.Array
+        An array of the shape (and convention) of ``geoid``, m/s^2.
     """
     geoid = jnp.asarray(geoid)
     if degrees is None:
@@ -337,9 +362,25 @@ def admittance(gravity, topography, convention: str) -> jax.Array:
     the shape alone does not tell a real array with a ``C/S`` axis from a complex one.
 
     Units: ``(m/s^2) / m = s^-2``; 1 mGal/km = 1e-8 s^-2. Where ``S_hh(l) = 0`` (degree 0,
-    a refused degree 1) the result is 0, through the double ``where`` of CONVENTIONS 2,
-    so the gradient is finite there. This is ruling 4: the admittance is post-processing
-    of field coefficients, not a kernel (audit row 10).
+    a refused degree 1) the result is 0. The division uses a second ``jnp.where`` that
+    replaces the zero denominator by 1 before the division, so the gradient is finite
+    there too (CONVENTIONS 2). The admittance is post-processing of field coefficients,
+    not a kernel (ruling 4; audit row 10).
+
+    Parameters
+    ----------
+    gravity
+        Coefficients of the gravity anomaly (``gravity_anomaly``), m/s^2.
+    topography
+        Coefficients of a topography (for example ``Fields.surface_topography``), m, of
+        the shape of ``gravity``.
+    convention
+        ``"real_4pi"``, ``"complex_4pi"`` or ``"real_orthonormal"``.
+
+    Returns
+    -------
+    jax.Array
+        ``(..., L+1)``: the batch axes of the inputs and the degree, s^-2.
     """
     s_gh = sh.degree_power(gravity, topography, convention)
     s_hh = sh.degree_power(topography, topography, convention)
