@@ -197,12 +197,48 @@ _SYNTH_PHASE = (0.3, 1.1, 2.0)  # phase_k of the cosine coefficients
 _SYNTH_S_SHIFT = 0.9            # extra phase of the sine coefficients
 
 
-def _synth_shapes(radius: str) -> tuple[float, float, float]:
-    """The three radial shapes b_k: a constant, a Gaussian of 300 km half-width
-    centred at 2000 km depth, and a linear ramp in depth (0 at the surface, 1 at the
-    CMB)."""
+# The cosines and the Gaussian of the synthetic anomaly, stored as float64 values.
+#
+# The Fortran golden runs read a density file whose text this module writes with 17
+# significant digits, and test_golden.py checks the sha256 of that text against the
+# manifest. The values of math.cos and math.exp come from the C maths library of the
+# platform, and the libraries of macOS and of glibc differ in the last bit for some
+# arguments (168 of the 3872 cosines here are not correctly rounded on macOS). The
+# text, and so the hash, would then depend on the machine. The table holds the values
+# that the golden runs were made with (reunion, macOS arm64, 2026-11-11), so the text
+# is the same on every platform: the remaining arithmetic is IEEE addition,
+# multiplication and division of Python floats, which every platform rounds the same
+# way. test_synthetic_basis_matches_formula checks that every entry is within a few
+# ulp of the formula on the running platform.
+SYNTH_BASIS_PATH = Path(__file__).parent / "data" / "synthetic_basis.npz"
+_SYNTH_BASIS = np.load(SYNTH_BASIS_PATH)
+# cos(1.3 (k+1) l + 0.7 m + phase_k [+ 0.9]) for [l, m, k, 0 (C) or 1 (S)]; zero at l = 0.
+SYNTH_COS = _SYNTH_BASIS["cos"]
+# exp(-((d - 2000 km) / 300 km)^2) at the 129 LEBEDEV nodes, CMB first.
+SYNTH_GAUSS = _SYNTH_BASIS["gauss"]
+
+
+def synth_cos_formula(l: int, m: int, k: int, sine: bool) -> float:
+    """The cosine of the synthetic anomaly from the formula, with the maths library of
+    the running platform. Used only to check the stored table ``SYNTH_COS``."""
+    a = 1.3 * (k + 1) * l + 0.7 * m + _SYNTH_PHASE[k]
+    return math.cos(a + _SYNTH_S_SHIFT) if sine else math.cos(a)
+
+
+def synth_gauss_formula(radius: str) -> float:
+    """The Gaussian radial shape from the formula, with the maths library of the
+    running platform. Used only to check the stored table ``SYNTH_GAUSS``."""
     d = float(_depth_km(radius))
-    return (1.0, math.exp(-((d - 2000.0) / 300.0) ** 2), d / 2890.0)
+    return math.exp(-((d - 2000.0) / 300.0) ** 2)
+
+
+def _synth_shapes(j: int) -> tuple[float, float, float]:
+    """The three radial shapes b_k at LEBEDEV node j (CMB first): a constant, a
+    Gaussian of 300 km half-width centred at 2000 km depth (from the stored table),
+    and a linear ramp in depth (0 at the surface, 1 at the CMB). The depth comes from
+    the decimal radius string, so the ramp is the same on every platform."""
+    d = float(_depth_km(LEBEDEV_RADIUS[j]))
+    return (1.0, float(SYNTH_GAUSS[j]), d / 2890.0)
 
 
 def synthetic_density(l: int, m: int, j: int) -> tuple[float, float]:
@@ -211,14 +247,15 @@ def synthetic_density(l: int, m: int, j: int) -> tuple[float, float]:
     ``C = A sum_k cos(1.3 k l + 0.7 m + phase_k) / (l + 1) b_k(r_j)`` and the same for
     S with the phase shifted by 0.9. Non-separable in (l, m, r). S is zero at m = 0
     and both are zero at l = 0. Units kg/m^3, in the coefficient convention of the
-    density file (CODE-A multiplies by sqrt(4 pi) on reading, util.f90:52).
+    density file (CODE-A multiplies by sqrt(4 pi) on reading, util.f90:52). The
+    cosines and the Gaussian come from the stored tables ``SYNTH_COS`` and
+    ``SYNTH_GAUSS`` (see the comment above them).
     """
     if l == 0:
         return 0.0, 0.0
-    b = _synth_shapes(LEBEDEV_RADIUS[j])
-    c = sum(math.cos(1.3 * (k + 1) * l + 0.7 * m + _SYNTH_PHASE[k]) * b[k] for k in range(3))
-    s = sum(math.cos(1.3 * (k + 1) * l + 0.7 * m + _SYNTH_PHASE[k] + _SYNTH_S_SHIFT) * b[k]
-            for k in range(3))
+    b = _synth_shapes(j)
+    c = sum(float(SYNTH_COS[l, m, k, 0]) * b[k] for k in range(3))
+    s = sum(float(SYNTH_COS[l, m, k, 1]) * b[k] for k in range(3))
     c = SYNTH_AMPLITUDE * c / (l + 1)
     s = SYNTH_AMPLITUDE * s / (l + 1) if m > 0 else 0.0
     return c, s

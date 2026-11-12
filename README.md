@@ -120,8 +120,8 @@ Run every test:
 The markers select tests by hand: `-m slow` (the tests above about 30 s), `-m "not slow"`,
 `-m "not heavy"` (without the tests of `tests/heavy_tests.txt`) and `-m "not legacy"`.
 
-Measured on reunion (Mac Studio, 32 CPUs) with `-n 8` on 2026-11-12: 1101 tests pass in
-339 s (1-minute load average 6.0 at the start and 10.0 at the end).
+Measured on reunion (Mac Studio, 32 CPUs) with `-n 8` on 2026-11-12: 1102 tests pass in
+327 s.
 
 The tests that need the directory `legacy/` (the CODE-A copy, not tracked) skip without
 it. The 13 tests that compare with lovejx skip when lovejx is not installed (it is not on

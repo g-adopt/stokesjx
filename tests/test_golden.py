@@ -89,6 +89,36 @@ def test_fortran_inputs_reproduce_from_cases(manifest):
             assert hashlib.sha256(synth.encode()).hexdigest() == rec["inputs"]["density_sha256"], run
 
 
+# Largest distance, in units in the last place of the formula value, between a stored
+# table entry and the formula evaluated with the maths library of the running platform.
+# The table holds the macOS values of the golden runs; macOS and glibc differ by at most
+# one ulp on these arguments, so two ulp leave a margin of one without letting a wrong
+# entry (a different argument or formula) pass.
+SYNTH_BASIS_ULP = 2
+
+
+def test_synthetic_basis_matches_formula():
+    """The stored cosines and Gaussian of the synthetic anomaly (cases.SYNTH_COS,
+    cases.SYNTH_GAUSS) are the formula of cases.synthetic_density to within
+    SYNTH_BASIS_ULP on this platform, so the table is the anomaly the docstring states
+    and only the last bit can depend on where it was computed."""
+    L = cases.SYNTH_LMAX
+    assert cases.SYNTH_COS.shape == (L + 1, L + 1, 3, 2)
+    assert cases.SYNTH_GAUSS.shape == (cases.LEBEDEV_NODES,)
+    assert np.all(cases.SYNTH_COS[0] == 0.0)
+    for l in range(1, L + 1):
+        for m in range(l + 1):
+            for k in range(3):
+                for side in (0, 1):
+                    f = cases.synth_cos_formula(l, m, k, bool(side))
+                    t = float(cases.SYNTH_COS[l, m, k, side])
+                    assert abs(t - f) <= SYNTH_BASIS_ULP * np.spacing(abs(f)), (l, m, k, side, t, f)
+    for j, r in enumerate(cases.LEBEDEV_RADIUS):
+        f = cases.synth_gauss_formula(r)
+        t = float(cases.SYNTH_GAUSS[j])
+        assert abs(t - f) <= SYNTH_BASIS_ULP * np.spacing(abs(f)), (j, t, f)
+
+
 def _sqt():
     """CODE-A's sqrt(4 pi) with the float32 pi, evaluated in double (constants.h:14)."""
     return float(np.sqrt(4.0 * np.float64(np.float32(math.pi))))

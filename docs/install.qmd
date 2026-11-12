@@ -47,8 +47,8 @@ The markers select tests by hand only:
 | `python -m pytest -n 8 -m "not heavy"` | every test except the tests of `tests/heavy_tests.txt` (above about 2 s each) |
 | `python -m pytest -n 8 -m "not legacy"` | every test that does not need `legacy/` |
 
-Measured on the author's machine (Mac Studio, 32 CPUs) with `-n 8` on 2026-11-12: 1101
-tests pass in 339 s, with 0 skipped.
+Measured on the author's machine (Mac Studio, 32 CPUs) with `-n 8` on 2026-11-12: 1102
+tests pass in 327 s, with 0 skipped.
 
 The marker `slow` marks a test above about 30 s with `-n 8`, or a test that repeats
 another test on a full table or at a higher degree.

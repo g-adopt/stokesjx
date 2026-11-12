@@ -72,6 +72,13 @@ MISFIT_TOL = 1e-14
 MISFIT_GRAD_TOL = 1e-15
 # The transposed form of the density map against the kernel form (two summation orders).
 SHEET_TOL = 1e-14
+# A batched call of Layers.fields against one call per batch member, relative to the
+# largest value of the field. The two calls contract the same numbers, but XLA may sum
+# them in another order for another array shape, so only rounding separates them. On
+# macOS arm64 the two were bit for bit equal; on the Linux x86-64 CI runner (2026-11-12)
+# they differed by 2.9e-10 absolute on values above 5.8e5, about 2 eps relative to the
+# largest value. 16 eps leaves a margin of about 8.
+BATCH_TOL = 16 * EPS
 # The jvp of the density map at a tie against a forward difference over 1 mm: the
 # truncation of a rational function of the radius over 1 mm and the rounding
 # eps / 1e-3 m.
@@ -1019,7 +1026,10 @@ def test_batch_axes_and_complex(F1):
     for b in range(3):
         Fs = F1.fields(K, d[:, b])
         for n in fields.FIELD_NAMES:
-            np.testing.assert_array_equal(np.asarray(getattr(Fb, n))[b], np.asarray(getattr(Fs, n)))
+            # Equal to rounding (BATCH_TOL): another batch shape can change the
+            # summation order of the contraction on some platforms.
+            a, s = np.asarray(getattr(Fb, n))[b], np.asarray(getattr(Fs, n))
+            assert np.max(np.abs(a - s)) <= BATCH_TOL * np.max(np.abs(s)), (n, b)
     dc = sj.sh.convert(d[:, 0], "real_4pi", "complex_4pi")
     Fc = F1.fields(K, dc)
     assert jnp.iscomplexobj(Fc.geoid)
