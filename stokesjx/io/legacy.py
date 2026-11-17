@@ -1,4 +1,4 @@
-"""Readers and writers of the file formats of CODE-A (numpy only, no JAX).
+"""Readers and writers of the legacy file formats (numpy only, no JAX).
 
 - ``read_viscosity``: a viscosity profile of ``VIS_PROF`` (``viscinit``,
   util.f90:353-364);
@@ -9,7 +9,8 @@
 Every coefficient array follows the layout rule of ``stokesjx.sh``: the degree and
 order axes last, the ``C/S`` axis at ``-3`` (index 0 for ``C``, 1 for ``S``), the radial
 axis first for a density, CMB first. The ``.sph`` files hold ``real_4pi`` coefficients
-(CODE-A multiplies them by ``sqt = sqrt(4 pi)`` on reading, util.f90:52); the ``SPHCO``
+(the legacy Fortran code multiplies them by ``sqt = sqrt(4 pi)`` on reading,
+util.f90:52); the ``SPHCO``
 files hold ``real_orthonormal`` coefficients.
 
 Each data line of an ``SPHCO`` file holds ``C`` and then ``S``, whatever its header line
@@ -25,7 +26,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-#: CODE-A's ``visc0 = 1e19 Pa s`` (constants.h:82), the unit of most files of VIS_PROF.
+#: The legacy ``visc0 = 1e19 Pa s`` (constants.h:82), the unit of most files of VIS_PROF.
 VISC0 = 1e19
 #: The four header lines of ``sphcout`` with a correct column line (C, then S).
 DEFAULT_HEADER = ("... HEADER", "... INPUT : ", "... ", "l, m, Cnm, Snm")
@@ -43,8 +44,8 @@ class SphDensity:
     radius
         ``(NR + 1,)``, m, CMB first.
     average
-        ``(NR + 1,)``, kg/m^3, CMB first: the averages of the file, which CODE-A reads
-        as ``rho0``.
+        ``(NR + 1,)``, kg/m^3, CMB first: the averages of the file, which the legacy
+        Fortran code reads as ``rho0``.
     coefficients
         ``(NR + 1, 2, LMAX + 1, LMAX + 1)``, kg/m^3, ``real_4pi`` (the file convention),
         CMB first: the density layout of ``fields.apply``.
@@ -64,9 +65,9 @@ def read_viscosity(path, n_nodes: int, *, unit: float = VISC0) -> np.ndarray:
     path
         The file: one value per line, surface first.
     n_nodes
-        The number of nodes ``nr + 1`` to read; CODE-A reads exactly this many lines.
+        The number of nodes ``nr + 1`` to read; ``viscinit`` reads exactly this many lines.
     unit
-        The factor to Pa s: ``1e19`` (CODE-A's ``visc0``) for the relative profiles,
+        The factor to Pa s: ``1e19`` (the legacy ``visc0``) for the relative profiles,
         ``1.0`` for a file in Pa s.
 
     Returns
@@ -91,7 +92,7 @@ def read_viscosity(path, n_nodes: int, *, unit: float = VISC0) -> np.ndarray:
 
 
 def read_sph(path) -> SphDensity:
-    """A ``.sph`` density file in the order of CODE-A's ``initialize`` (util.f90:7-54).
+    """A ``.sph`` density file in the order of the legacy ``initialize`` (util.f90:7-54).
 
     Line 1: ``LMAX`` from columns 8-11 and ``NR`` from columns 16-19. Lines 2 and 3 are
     not read (the second holds ``# Density`` or ``# Temperature: INPUT ...``). Then
@@ -141,7 +142,7 @@ def read_sphco(path) -> np.ndarray:
 
     Every line that starts with ``SPHCO`` holds ``l``, ``m``, ``C``, ``S`` in this order
     (audit row 11). ``L`` is the largest ``l`` of the file; degrees below the first line
-    (``l_min = 1`` in CODE-A) are zero. A Fortran exponent of three digits without the
+    (``l_min = 1`` in the legacy files) are zero. A Fortran exponent of three digits without the
     letter ``E`` (``0.123456-100``) is read too.
 
     Parameters
@@ -207,10 +208,10 @@ def _format_es25_16e3(x: float) -> str:
 
 
 def write_sphco(path, coefficients, *, lmin: int = 1, digits: int = 6, header: tuple[str, ...] | None = None) -> None:
-    """Write coefficients in the format of CODE-A's ``sphcout`` (util.f90:215-240).
+    """Write coefficients in the format of the legacy ``sphcout`` (util.f90:215-240).
 
     Each data line is ``SPHCO``, ``l`` and ``m`` as ``I8``, then ``C`` and ``S``; the ``S``
-    of ``m = 0`` is written as zero, as in CODE-A. The last line is
+    of ``m = 0`` is written as zero, as ``sphcout`` does. The last line is
     ``... END OF FILE!``.
 
     Parameters
@@ -221,12 +222,12 @@ def write_sphco(path, coefficients, *, lmin: int = 1, digits: int = 6, header: t
         ``(2, L+1, L+1)``, ``real_orthonormal`` (for example one field of ``Fields`` of a
         real density, converted with ``sh.convert``).
     lmin
-        First degree written (CODE-A's ``l_min = 1``).
+        First degree written (the legacy ``l_min = 1``).
     digits
-        ``6``: the Fortran ``e15.6`` of CODE-A, byte for byte. ``16``: ``es25.16e3``, the
+        ``6``: the Fortran ``e15.6`` of ``sphcout``, byte for byte. ``16``: ``es25.16e3``, the
         format of the golden harness patch.
     header
-        The lines before the data; default ``DEFAULT_HEADER``, CODE-A's four lines with a
+        The lines before the data; default ``DEFAULT_HEADER``, the four legacy lines with a
         correct column line (C, then S). Pass the header of a Fortran file to reproduce
         it byte for byte.
     """

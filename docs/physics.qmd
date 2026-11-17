@@ -70,9 +70,9 @@ $$
 $$
 
 with $\sigma_{rr} = S_{rr} Y$ and $\sigma_{r\theta} = S\,\partial Y/\partial\theta$. All six
-components are in m/s. $\eta_s$ and $\rho_s$ are scales (CODE-A: $10^{19}$ Pa s and
-4500 kg/m³; the package uses the largest node viscosity for $\eta_s$). The matrix of the
-radial system depends on $\eta/\eta_s$ and $\rho_0/\rho_s$ only:
+components are in m/s. $\eta_s$ and $\rho_s$ are scales. The package uses the largest
+node viscosity for $\eta_s$ and 4500 kg/m³ for $\rho_s$. The matrix of the radial system
+depends on $\eta/\eta_s$ and $\rho_0/\rho_s$ only:
 
 $$
 A = A(l,\ \eta/\eta_s,\ \rho_0/\rho_s,\ \kappa)
@@ -537,6 +537,8 @@ TALA the kernels jump when the cut crosses a density pair ([derivatives](gradien
   convection using seismic observations, flow models, and the geoid. In *Mantle
   Convection: Plate Tectonics and Global Dynamics*, ed. W. R. Peltier, Gordon and Breach,
   657-763.
+- Hager, B. H. and O'Connell, R. J. (1981). A simple global model of plate dynamics and
+  mantle convection. *Journal of Geophysical Research*, 86, 4843-4867.
 - Higham, N. J. (2002). *Accuracy and Stability of Numerical Algorithms*, 2nd ed. SIAM.
 - Higham, N. J. (2005). The scaling and squaring method for the matrix exponential
   revisited. *SIAM Journal on Matrix Analysis and Applications*, 26, 1179-1193.

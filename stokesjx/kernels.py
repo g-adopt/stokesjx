@@ -128,7 +128,7 @@ class StokesConfig:
         if not isinstance(self.degree_one, DegreeOneFrame):
             raise TypeError(f"degree_one must be a DegreeOneFrame, got {self.degree_one!r}")
         if self.degree_one is DegreeOneFrame.LEGACY_GEOID_ZERO:
-            raise ValueError("DegreeOneFrame.LEGACY_GEOID_ZERO is CODE-A's frame and is offered only by the "
+            raise ValueError("DegreeOneFrame.LEGACY_GEOID_ZERO is the legacy frame and is offered only by the "
                              "test-only low layer (propagate.Discretisation)")
         if not isinstance(self.formulation, Formulation):
             raise TypeError(f"formulation must be a Formulation, got {self.formulation!r}")
@@ -187,7 +187,7 @@ class Kernels:
         ``A_j = phi_a(R) / R`` and ``M_eff = M_mantle + (4 pi / 3) r_c^3 rho_c``. It is
         the momentum error of a split core (up to 7e-3 for a PREM core mass with
         ``rho_c = 9900``) and zero up to rounding for a consistent core. An exact zero
-        in the raw frame and in CODE-A's frame, which have no applied field.
+        in the raw frame and in the legacy frame, which have no applied field.
     """
 
     degrees: tuple[int, ...]
@@ -291,7 +291,7 @@ def stokes_kernels(profile: RadialProfile, config: StokesConfig) -> Kernels:
       ten decades of viscosity at ``l`` up to 100 under no slip, TALA, NO_SELF_GRAVITY
       and a uniform background; against the analytical solutions of Kramer, Davies and
       Wilson (2021; NO_SELF_GRAVITY, uniform ``g``, free slip and no slip) 1.2e-14; with
-      CODE-A's legacy switches against the Fortran under TALA (``kappaindex = 1``) and no
+      the legacy switches against the legacy Fortran output under TALA (``kappaindex = 1``) and no
       slip at most 3.0e-13;
     - values, default flags, with a
       1e27 Pa s layer on a 1e20 Pa s mantle (a lid of 70 km, or a layer from 670 to

@@ -66,14 +66,14 @@ class Discretisation:
     ----------
     material
         ``"interval_mean"`` (stokesjx, eq. 12.1) or ``"upper_node"``: the viscosity and
-        the density of an interval are those of its upper node, as CODE-A's
+        the density of an interval are those of its upper node, as the legacy
         ``aconstruct`` (driver.f:362-363).
     degree_one_geoid_zero
-        CODE-A's degree-1 frame: the raw solve with the degree-1 geoid set to zero
+        The legacy degree-1 frame: the raw solve with the degree-1 geoid set to zero
         (driver.f:282-284). Needs the raw frame to be offered (a uniform background).
     kappa_rule
         The TALA term of an interval (``system.kappa_widths``): ``"log_slope"``
-        (stokesjx, eq. 12.2) or ``"legacy_one_sided"``, CODE-A's one-sided slope at the
+        (stokesjx, eq. 12.2) or ``"legacy_one_sided"``, the legacy one-sided slope at the
         upper node times the width (``kappaindex = 1``, driver.f:429-430). The legacy
         rule divides by the radial gap of an interval, so ``static_plan`` refuses it on
         a structure with jump pairs.
@@ -107,7 +107,7 @@ class StaticPlan:
     potential_coefficient
         ``a_l`` of the surface potential row per degree (``boundary.surface_potential_coefficient``).
     geoid_mask
-        1.0 or 0.0 per degree (0 at ``l = 1`` in the CM frame and in CODE-A's frame).
+        1.0 or 0.0 per degree (0 at ``l = 1`` in the CM frame and in the legacy frame).
     pade
         The Pade plan of the interval exponentials (``linalg.pade_plan``).
     pairs
@@ -171,10 +171,10 @@ def static_plan(structure: NodeStructure, config: StokesConfig,
     """Build the static plan of a solve (cached; every argument is hashable).
 
     1. Frame at ``l = 1``: ``formulation.resolve_degree_one`` of the requested frame;
-       with ``degree_one_geoid_zero`` the request is CODE-A's frame, which needs raw
+       with ``degree_one_geoid_zero`` the request is the legacy frame, which needs raw
        to be offered. A refused frame removes degree 1 from the degrees.
     2. ``a_l = l + 1``, and ``-1`` at ``l = 1`` in the CM frame (eq. 8.2, 10.5).
-    3. The geoid mask (0 at ``l = 1`` in the CM frame and in CODE-A's frame).
+    3. The geoid mask (0 at ``l = 1`` in the CM frame and in the legacy frame).
     4. The term record of the flags (``formulation.terms``).
     5. The Pade plan from the column-wise norm bound
        (``linalg.balanced_norm_bound_intervals``) of the construction widths, the
@@ -195,10 +195,10 @@ def static_plan(structure: NodeStructure, config: StokesConfig,
     ``1 + 2 eps``), so the bound of the construction widths covers it.
 
     Raises ``ValueError`` for a frame that the static rule does not offer, for
-    CODE-A's one-sided TALA rule on a structure with jump pairs (it divides by the
-    radial gap of an interval), for a structure with viscosity cuts under CODE-A's
-    material rule or CODE-A's TALA rule (both exist for the comparison with the Fortran
-    only), and for ``structure.limits`` beyond the static limits
+    the legacy one-sided TALA rule on a structure with jump pairs (it divides by the
+    radial gap of an interval), for a structure with viscosity cuts under the legacy
+    material rule or the legacy TALA rule (both exist for the comparison with the
+    Fortran only), and for ``structure.limits`` beyond the static limits
     of ``Numerics``: ``limits.rho0_max > rho0_max`` under FULL, or ``limits.kappa_h >
     kappa_h_max`` on an ordinary interval under TALA. These two checks replace, for the
     moved nodes, the value checks that ``check_profile`` cannot run on a traced radius
@@ -208,7 +208,7 @@ def static_plan(structure: NodeStructure, config: StokesConfig,
     request = config.degree_one
     if discretisation.degree_one_geoid_zero:
         if request not in (DegreeOneFrame.DEFAULT, DegreeOneFrame.RAW):
-            raise ValueError("degree_one_geoid_zero is CODE-A's raw frame; it cannot be combined with "
+            raise ValueError("degree_one_geoid_zero is the legacy raw frame; it cannot be combined with "
                              f"the request {request.value!r}")
         request = DegreeOneFrame.LEGACY_GEOID_ZERO
     frame = resolve_degree_one(form, structure.consistent_core, request)
@@ -225,12 +225,12 @@ def static_plan(structure: NodeStructure, config: StokesConfig,
     kappa_h_max = config.numerics.kappa_h_max if term_record.anelastic else 0.0
     if structure.cuts and discretisation.material != "interval_mean":
         raise ValueError("a viscosity cut splits an interval of the interval-mean material rule (eq. 12.1); "
-                         f"CODE-A's material rule {discretisation.material!r} is for the Fortran comparison only")
+                         f"the legacy material rule {discretisation.material!r} is for the Fortran comparison only")
     if structure.cuts and term_record.anelastic and discretisation.kappa_rule != "log_slope":
         raise ValueError("a viscosity cut shares kappa_h of the log-slope rule (eq. 12.2) between its two parts; "
-                         f"CODE-A's TALA rule {discretisation.kappa_rule!r} is for the Fortran comparison only")
+                         f"the legacy TALA rule {discretisation.kappa_rule!r} is for the Fortran comparison only")
     if term_record.anelastic and discretisation.kappa_rule == "legacy_one_sided" and structure.pairs:
-        raise ValueError("the one-sided kappa rule of CODE-A divides by the radial gap of an interval and is "
+        raise ValueError("the legacy one-sided kappa rule divides by the radial gap of an interval and is "
                          f"undefined at the jump pairs {structure.pairs}; use kappa_rule='log_slope'")
     # Under TALA a jump pair strictly inside a cut range: the step of the pair takes the
     # viscosity of its two members (eq. 12.3), which changes side when the cut passes the
@@ -557,7 +557,7 @@ def _core(profile: RadialProfile, plan: StaticPlan, config: StokesConfig, ref_ru
         m_eff = mantle_mass(r, rho0, units) + 4.0 * pi / 3.0 * rc ** 3 * profile.core_density
         out["degree_one_imbalance"] = m_eff * A / (4.0 * pi / 3.0 * g * r ** 2)
     elif plan.frame is not None:
-        # The raw frame and CODE-A's frame have no applied field: an exact zero, not
+        # The raw frame and the legacy frame have no applied field: an exact zero, not
         # the rounding residue of the fourth row.
         out["degree_one_imbalance"] = jnp.zeros_like(r)
     return out

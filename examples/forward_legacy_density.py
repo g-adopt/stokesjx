@@ -1,5 +1,5 @@
-"""Forward run of stokesjx from a CODE-A density file: kernels, the four fields and the
-output files of CODE-A.
+"""Forward run of stokesjx from a legacy ``.sph`` density file: kernels, the four fields
+and the field files in the legacy ``SPHCO`` format.
 
 Command line::
 
@@ -9,14 +9,13 @@ Command line::
 Options:
 
 ``--sph PATH``
-    A ``.sph`` density file in CODE-A's format (``stokesjx.io.legacy.read_sph``). The
-    default is ``legacy/CODE-A/INPUT/DENSITY_INPUTS/LEBEDEV_S4RTS.sph`` of the
-    repository (the S4RTS tomography converted to density, ``LMAX`` 50, 129 radii). The
-    ``legacy/`` directory is not tracked; if the default file is absent, the script stops
-    with a message that names ``--sph``.
+    A ``.sph`` density file (``stokesjx.io.legacy.read_sph``). The default file holds
+    the S4RTS tomography converted to density (``LMAX`` 50, 129 radii). It is not
+    distributed with the repository; if it is absent, the script stops with a message
+    that names ``--sph``. Give a density file with ``--sph PATH``.
 ``--viscosity PATH``
-    A CODE-A viscosity file (one relative viscosity per line, surface first, in units of
-    CODE-A's ``visc0 = 1e19 Pa s``; ``io.legacy.read_viscosity``) with one value per node
+    A legacy viscosity file (one relative viscosity per line, surface first, in units of
+    ``visc0 = 1e19 Pa s``; ``io.legacy.read_viscosity``) with one value per node
     of the density file. The default is the hager4 layering by depth
     (``earth_model.HAGER4_LAYERS``): each node takes the viscosity of the layer that holds
     it, a node on a layer bottom the layer below.
@@ -32,8 +31,8 @@ Outputs in ``--out``:
 - ``SPH_geoid``, ``SPH_surftopo``, ``SPH_cmbtopo``, ``SPH_surfvel``: the geoid (m), the
   surface and the CMB dynamic topography (m, outward positive) and the surface velocity
   (m/s, the coefficients of the RMS horizontal speed) as ``real_orthonormal`` coefficients
-  in CODE-A's ``SPHCO`` format (``io.legacy.write_sphco``, the Fortran ``e15.6``), the
-  file names of CODE-A;
+  in the legacy ``SPHCO`` format (``io.legacy.write_sphco``, the Fortran ``e15.6``),
+  with the legacy file names;
 - ``kernels_fields.npz``: the degrees, the radius (m), the four kernels ``(L, N)`` per
   kg/m^2 and the four fields ``(2, L+1, L+1)`` in ``real_4pi``;
 - with ``--grid``, ``grids.npz``: the latitudes (89.5 to -89.5 degrees north), the
@@ -45,14 +44,14 @@ The script prints the root mean square over the sphere of each field
 geoid degree power for ``l = 2 .. 10``.
 
 Physics. The run uses the SI physics of the high layer: the reference density
-``rho0`` is the "Averages" column of the file (as in CODE-A), the gravity is integrated
+``rho0`` is the "Averages" column of the file, the gravity is integrated
 from ``rho0`` and a consistent core of 9900 kg/m^3 (the core of the golden Fortran runs),
 the material of an interval is the mean of its two nodes, and the radial integral is the
-trapezoid rule (``fields.apply``). CODE-A's own choices (a uniform ``g = 10`` m/s^2, the
-material of the upper node, CODE-A's quadrature weights) are test-only switches of the
+trapezoid rule (``fields.apply``). The legacy switches (a uniform ``g = 10`` m/s^2, the
+material of the upper node, equal quadrature weights) are test-only switches of the
 low layer and are not offered here. The test that compares the package under these
 switches with the Fortran output is ``tests/test_fields.py::test_fields_against_fortran``.
-Because the physics differs, the fields of this script differ from CODE-A's; the
+Because the physics differs, the fields of this script differ from the Fortran output; the
 geoid coefficients of the LEBEDEV file correlate per degree with the Fortran geoid at
 every degree from 2 to 50 (test ``tests/test_examples.py::test_forward_example_lebedev``).
 
@@ -75,13 +74,13 @@ from stokesjx.io import legacy
 
 _HERE = Path(__file__).resolve().parent
 _REPO = _HERE.parent
-#: The default density file: CODE-A's S4RTS density, not tracked (``legacy/``).
+#: The default density file: the S4RTS density, not distributed (``legacy/`` is not tracked).
 DEFAULT_SPH = _REPO / "legacy" / "CODE-A" / "INPUT" / "DENSITY_INPUTS" / "LEBEDEV_S4RTS.sph"
 #: The default output directory (``examples/output/`` is in ``.gitignore``).
 DEFAULT_OUT = _HERE / "output" / "forward"
 #: The core density of the golden Fortran runs, kg/m^3, as a consistent core.
 CORE_DENSITY = 9900.0
-#: CODE-A's names of the field files, in the order of ``fields.FIELD_NAMES``.
+#: The legacy names of the field files, in the order of ``fields.FIELD_NAMES``.
 SPHCO_NAMES = {"geoid": "SPH_geoid", "surface_topography": "SPH_surftopo",
                "cmb_topography": "SPH_cmbtopo", "surface_velocity": "SPH_surfvel"}
 
@@ -102,10 +101,10 @@ def _earth_model():
 
 def parse_args(argv=None) -> argparse.Namespace:
     """The command line of the module docstring. ``argv=None`` reads ``sys.argv``."""
-    p = argparse.ArgumentParser(description="Forward run of stokesjx from a CODE-A density file.")
+    p = argparse.ArgumentParser(description="Forward run of stokesjx from a legacy .sph density file.")
     p.add_argument("--sph", type=Path, default=DEFAULT_SPH, help="the .sph density file")
     p.add_argument("--viscosity", type=Path, default=None,
-                   help="CODE-A viscosity file (surface first, units of 1e19 Pa s); default hager4 by depth")
+                   help="legacy viscosity file (surface first, units of 1e19 Pa s); default hager4 by depth")
     p.add_argument("--lmax", type=int, default=None, help="largest degree (default: LMAX of the file)")
     p.add_argument("--out", type=Path, default=DEFAULT_OUT, help="output directory")
     p.add_argument("--grid", action="store_true", help="also write the fields on a 1-degree grid")
@@ -155,8 +154,8 @@ def run(args) -> dict:
     """
     sph_path = Path(args.sph)
     if not sph_path.is_file():
-        raise FileNotFoundError(f"the density file {sph_path} does not exist; the default file is in the untracked "
-                                f"legacy/ directory, so pass a CODE-A .sph file with --sph PATH")
+        raise FileNotFoundError(f"the density file {sph_path} does not exist; the default density file is not "
+                                f"distributed, so pass a .sph density file with --sph PATH")
     dens = legacy.read_sph(sph_path)
     lmax = dens.lmax if args.lmax is None else int(args.lmax)
     if not 1 <= lmax <= dens.lmax:

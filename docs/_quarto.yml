@@ -27,23 +27,22 @@ website:
     left:
       - text: "Home"
         href: index.qmd
-      - text: "Install"
-        href: install.qmd
       - text: "Physics"
         href: physics.qmd
-      - text: "Usage"
-        href: usage.qmd
       - text: "Derivatives"
         href: gradients.qmd
+      - text: "Validation"
+        href: validation.qmd
       # The entry links the HTML page, because quartodoc writes the reference
       # pages before the render and the link must not depend on that order.
       - text: "API"
         href: reference/index.html
-      - text: "Validation"
-        href: validation.qmd
-      - text: "Open points"
-        href: open-points.qmd
+      - text: "Citation"
+        href: citation.qmd
     right:
+      - icon: person-circle
+        href: "https://sia-g.com"
+        aria-label: "The website of the author"
       - icon: github
         href: "https://github.com/g-adopt/stokesjx"
         aria-label: "The repository on GitHub"
@@ -51,12 +50,10 @@ website:
     style: floating
     contents:
       - index.qmd
-      - install.qmd
       - physics.qmd
-      - usage.qmd
       - gradients.qmd
       - validation.qmd
-      - open-points.qmd
+      - citation.qmd
       - agentic-coding.qmd
       - section: "API reference"
         contents:
@@ -66,8 +63,8 @@ website:
             href: reference/index.html
   page-footer:
     center: |
-      stokesjx is released under the Apache License, Version 2.0.
-      It implements the method of CODE-A (Corrieu, Thoraval and Ricard 1995; Hager and Clayton 1989).
+      stokesjx is developed by [Sia Ghelichkhan](https://sia-g.com) and released under
+      the Apache License, Version 2.0.
 
 format:
   html:
@@ -187,12 +184,12 @@ quartodoc:
         - sh.convert
         - sh.synthesis_grid
         - sh.degree_power
-    - title: "CODE-A file formats"
+    - title: "Legacy file formats"
       desc: >
-        The readers and the writer of the file formats of CODE-A: the density
-        file (.sph), the viscosity file and the SPHCO coefficient files. The
-        module stokesjx.io.legacy needs numpy only, and the package does not
-        import it. Import it on use.
+        The readers and the writer of three text formats: the .sph density
+        file, the viscosity file and the SPHCO coefficient files. The module
+        stokesjx.io.legacy needs numpy only, and the package does not import
+        it. Import it on use.
       contents:
         - io.legacy.SphDensity
         - io.legacy.read_viscosity

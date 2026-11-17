@@ -144,7 +144,7 @@ def radial_integral(kernels: Kernels, density, weights) -> Fields:
         ``-3`` (``*batch`` ends in 2). The convention is not read: the radial integral
         does not mix the ``C/S``, degree or order axes.
     weights
-        ``(N,)``, m: the radial quadrature weights (``quadrature_weights``, or CODE-A's
+        ``(N,)``, m: the radial quadrature weights (``quadrature_weights``, or the legacy
         equal weights in the tests).
 
     Returns
@@ -311,8 +311,8 @@ def gravity_anomaly(geoid, g_surface, radius, degrees=None) -> jax.Array:
     degree-0 response (a density anomaly of degree 0 changes the mass of the Earth), and
     a degree-0 entry from elsewhere (a mean geoid height, a reference offset) is not a
     mass anomaly of the model; ``(l - 1) = -1`` would turn it into a gravity value with
-    no meaning. This replaces CODE-A's free-air kernel, which uses ``G Emass / R^2`` here
-    and 10 m/s^2 everywhere else (audit row 2).
+    no meaning. The surface gravity is that of the profile, so the anomaly and the kernels
+    use the same gravity.
 
     Parameters
     ----------

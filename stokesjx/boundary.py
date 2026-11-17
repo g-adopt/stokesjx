@@ -161,8 +161,8 @@ def surface_functionals(degrees, *, R, g_R, rho_top, rho_w, rho_s, eta_ref, c_s,
 
     Row 0, geoid (eq. 9.1): ``N = eta_ref y5(R) / (rho_s R g(R))``, m per kg/m^2, times
     the static ``geoid_mask`` per degree (0 at ``l = 1`` in the CM frame, where the
-    self-potential is zero by construction, eq. 10(d), and in CODE-A's frame,
-    driver.f:282-284).
+    self-potential is zero by construction, eq. 10(d), and in the legacy frame
+    ``LEGACY_GEOID_ZERO``, driver.f:282-284).
 
     Row 1, surface topography (eq. 9.2, 8.3):
     ``h_s = -(sigma_rr + rho_w phi) / ((rho_top - rho_w) g(R))`` with

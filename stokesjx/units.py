@@ -3,7 +3,7 @@
 Two things live here: the values of the physical constants that enter the
 solver (the gravitational constant ``G``, ``pi`` and the mass of the Earth), and the
 density scale ``rho_s`` of the state vector (NOTES/docs/equations.md, eq. 3.1). The mass
-of the Earth enters only CODE-A's free-air kernel, which a legacy test evaluates
+of the Earth enters only the legacy free-air kernel, which a legacy test evaluates
 (``tests/test_fields.py::test_gravity_anomaly_against_fortran``); the package takes the
 surface gravity of a free-air anomaly from the profile (``fields.surface_gravity``).
 
@@ -18,13 +18,13 @@ Two modes, as in lovejx (``lovejx/lovenumbers/units.py``):
 ``legacy_constants=False`` (the default) uses CODATA 2018 ``G = 6.67430e-11
 m^3 kg^-1 s^-2``, the exact ``pi`` and ``M_E = 5.9722e24 kg``.
 
-``legacy_constants=True`` reproduces the arithmetic of CODE-A. gfortran without
+``legacy_constants=True`` reproduces the arithmetic of the legacy Fortran code. gfortran without
 ``-fdefault-real-8`` rounds an untyped real literal to float32 before it promotes it
-to double (equations.md, F13). So CODE-A's ``G`` is the float32 neighbour of
+to double (equations.md, F13). So the legacy ``G`` is the float32 neighbour of
 ``6.67e-11`` (constants.h:8), its ``pi`` is the float32 neighbour of ``pi``
 (constants.h:9; the literal has 40 digits, but it is single precision), and its
-``Emass`` is the float32 neighbour of ``5.974e24`` (constants.h:12). The legacy ``pi``
-of CODE-A differs from the legacy ``pi`` of lovejx, which is the float32 of the
+``Emass`` is the float32 neighbour of ``5.974e24`` (constants.h:12). This legacy ``pi``
+differs from the legacy ``pi`` of lovejx, which is the float32 of the
 decimal ``3.14159``: each switch reproduces the code that it is compared with.
 The switch exists only for the comparison with the Fortran output.
 """
@@ -41,7 +41,7 @@ _G_CODATA = 6.67430e-11
 # Mass of the Earth, kg (IAU 2015 nominal value of GM divided by G, rounded).
 _EARTH_MASS = 5.9722e24
 
-# CODE-A's constants, rounded to float32 as the compiled Fortran holds them (F13).
+# The legacy constants, rounded to float32 as the compiled Fortran holds them (F13).
 # float(np.float32(x)) is the exact binary value, so these equal the mpmath values
 # reference_mpmath.LEGACY_G, LEGACY_PI and LEGACY_EMASS bit for bit.
 _G_LEGACY = float(np.float32(6.67e-11))        # 6.66999996901118663573e-11
@@ -57,11 +57,11 @@ class Units:
     Parameters
     ----------
     legacy_constants
-        Reproduce CODE-A's float32 literals for ``G``, ``pi`` and the mass of the
+        Reproduce the legacy float32 literals for ``G``, ``pi`` and the mass of the
         Earth (see the module docstring). Only for the comparison with the Fortran.
     density_scale
         ``rho_s`` in kg/m^3: the density unit of the state vector (eq. 3.1) and of the
-        matrix entries ``a(3,6) = a(4,5) = -rho0 / rho_s`` (eq. 5.1). CODE-A's
+        matrix entries ``a(3,6) = a(4,5) = -rho0 / rho_s`` (eq. 5.1). The legacy
         ``bgrho = 4500 kg/m^3`` (constants.h:80) is the default. No SI kernel depends
         on it in exact arithmetic (equations.md section 11;
         NOTES/chunks/c1-foundations/03-implementation.md, gate G6); in float64 a
@@ -72,14 +72,14 @@ class Units:
     Attributes
     ----------
     G
-        Gravitational constant, m^3 kg^-1 s^-2: ``6.67430e-11``, or CODE-A's
+        Gravitational constant, m^3 kg^-1 s^-2: ``6.67430e-11``, or the legacy
         ``float32(6.67e-11) = 6.66999996901118663573e-11`` with ``legacy_constants``.
     pi
-        ``pi``, or CODE-A's ``float32(pi) = 3.14159274101257324219`` with
+        ``pi``, or the legacy ``float32(pi) = 3.14159274101257324219`` with
         ``legacy_constants``. It enters every ``4 pi G``.
     earth_mass
-        Mass of the Earth, kg: ``5.9722e24``, or CODE-A's ``float32(5.974e24)`` with
-        ``legacy_constants``. Used by CODE-A's free-air kernel, never by the kernels.
+        Mass of the Earth, kg: ``5.9722e24``, or the legacy ``float32(5.974e24)`` with
+        ``legacy_constants``. Used by the legacy free-air kernel, never by the kernels.
     """
 
     legacy_constants: bool = False
@@ -94,19 +94,19 @@ class Units:
 
     @property
     def G(self) -> float:
-        """Gravitational constant, m^3 kg^-1 s^-2: ``6.67430e-11`` or CODE-A's
+        """Gravitational constant, m^3 kg^-1 s^-2: ``6.67430e-11`` or the legacy
         ``float32(6.67e-11) = 6.66999996901118663573e-11``."""
         return _G_LEGACY if self.legacy_constants else _G_CODATA
 
     @property
     def pi(self) -> float:
-        """``pi``, or CODE-A's ``float32(pi) = 3.14159274101257324219``. It enters every
+        """``pi``, or the legacy ``float32(pi) = 3.14159274101257324219``. It enters every
         ``4 pi G`` (the potential jump of a sheet, the boundary potential conditions,
         the gravity integral)."""
         return _PI_LEGACY if self.legacy_constants else math.pi
 
     @property
     def earth_mass(self) -> float:
-        """Mass of the Earth, kg: ``5.9722e24`` or CODE-A's ``float32(5.974e24)``. Used
-        by CODE-A's free-air kernel (``fields.gravity_anomaly`` in the tests), never by the kernels."""
+        """Mass of the Earth, kg: ``5.9722e24`` or the legacy ``float32(5.974e24)``. Used
+        by the legacy free-air kernel (``fields.gravity_anomaly`` in the tests), never by the kernels."""
         return _EARTH_MASS_LEGACY if self.legacy_constants else _EARTH_MASS

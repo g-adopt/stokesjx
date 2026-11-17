@@ -269,7 +269,7 @@ def interval_material(eta, rho0, rule: str) -> tuple[jax.Array, jax.Array]:
     """Interval viscosity and density, ``(N - 1,)`` each.
 
     ``rule="interval_mean"`` (stokesjx, eq. 12.1): ``etabar_i = (eta_(i-1) + eta_i) / 2``
-    and the same for ``rho0``. ``rule="upper_node"`` (CODE-A, driver.f:362-363, test
+    and the same for ``rho0``. ``rule="upper_node"`` (legacy, driver.f:362-363, test
     only): the values of the upper node ``i``.
     """
     if rule == "interval_mean":
@@ -295,7 +295,7 @@ def kappa_widths(radius, rho0, structure: NodeStructure, rule: str) -> jax.Array
     rule
         ``"log_slope"`` (stokesjx, eq. 12.2): ``kappa_h_i = ln(rho0_i / rho0_(i-1))``,
         exact for a power-law ``rho0 ~ r^kappa`` inside the interval. ``"legacy_one_sided"``
-        (CODE-A, driver.f:429-430, test only): the one-sided slope at the upper node
+        (legacy, driver.f:429-430, test only): the one-sided slope at the upper node
         times the width, ``(r_i / rho0_i) (rho0_i - rho0_(i-1)) / (r_i - r_(i-1)) h_i``.
         It divides by the radial gap, so ``propagate.static_plan`` refuses it on a
         structure with pairs.

@@ -5,13 +5,14 @@ of lovejx. The tests read files only; Quarto is not run, so the tests run in CI.
 ``test_quarto_config``
     ``docs/_quarto.yml`` parses; the site and repository URLs; the quartodoc package and
     parser; every page of the navbar and the sidebar exists; the set of pages is the
-    eight pages of the site, and no page path names a benchmark.
+    six pages of the site, and no page path names a benchmark.
 ``test_reference_lists_every_public_name``
     The entries of the quartodoc sections are exactly the public names (the rule of the
     function docstring), none twice, each resolves; the public constants of the modules
     in the rule are exactly ``PUBLIC_CONSTANTS``.
 ``test_pages_need_no_notes``
-    No page points the reader at the working notes or at the CODE-A copy.
+    No page points the reader at the working notes, names the legacy Fortran code or
+    links a page that the site does not hold.
 ``test_pages_ste_modals``
     No page uses a modal of ``BANNED_MODALS`` (ASD-STE100) outside code.
 ``test_equation_numbers_resolve``
@@ -20,14 +21,15 @@ of lovejx. The tests read files only; Quarto is not run, so the tests run in CI.
 ``test_equation_tags_unique``
     Every ``\\tag`` of the site occurs once.
 ``test_page_code_runs``
-    The Python blocks of the usage and the derivatives page run in order and give finite
+    The Python blocks of the home and the derivatives page run in order and give finite
     results, with ``lmax`` at most 20.
 ``test_page_numbers_match_code``
     The numbers that the pages state and the code holds are equal (the table of the
     function docstring).
-``test_open_points_and_readme_links``
-    The open-points page says that the comparisons against published values come later;
-    the README links the site and its agentic-coding page.
+``test_readme_links_and_citation``
+    The README links the site and its agentic-coding page and does not name the legacy
+    Fortran code; ``CITATION.cff``, the citation page and the package state the same
+    version, and the citation page names the author's ORCID.
 ``test_check_site_detects_*``
     Each check function of ``docs/_check_site.py`` fails on a small broken input and
     passes on the repaired input.
@@ -56,9 +58,8 @@ from test_docs import BANNED_MODALS, REPO, _readme_without_code  # noqa: E402
 
 DOCS = REPO / "docs"
 TESTS = REPO / "tests"
-#: The eight pages of the site, in the order of the sidebar.
-PAGES = ("index.qmd", "install.qmd", "physics.qmd", "usage.qmd", "gradients.qmd", "validation.qmd",
-         "open-points.qmd", "agentic-coding.qmd")
+#: The six pages of the site, in the order of the sidebar.
+PAGES = ("index.qmd", "physics.qmd", "gradients.qmd", "validation.qmd", "citation.qmd", "agentic-coding.qmd")
 #: The modules whose public classes and functions are in the reference besides the
 #: non-module names of ``stokesjx.__all__``.
 REFERENCE_MODULES = ("stokesjx.fields", "stokesjx.sh", "stokesjx.controls", "stokesjx.io.legacy")
@@ -66,10 +67,14 @@ REFERENCE_MODULES = ("stokesjx.fields", "stokesjx.sh", "stokesjx.controls", "sto
 #: a new constant fails the test and waits for a decision.
 PUBLIC_CONSTANTS = {"stokesjx.sh.CONVENTIONS", "stokesjx.fields.FIELD_NAMES", "stokesjx.controls.CLAMP_FRACTION",
                     "stokesjx.io.legacy.VISC0", "stokesjx.io.legacy.DEFAULT_HEADER"}
-#: Text that points the reader at the unpublished working notes or the CODE-A copy.
-FORBIDDEN = ("NOTES/", "legacy/CODE-A", "PLAN.md", "CONVENTIONS.md", "HANDOVER", "TOLERANCES.md")
+#: Text that points the reader at the unpublished working notes, names the legacy
+#: Fortran code, or links the pages that the site no longer holds.
+FORBIDDEN = ("NOTES/", "CODE-A", "PLAN.md", "CONVENTIONS.md", "HANDOVER", "TOLERANCES.md",
+             "open-points", "install.qmd", "usage.qmd")
+#: The author's ORCID, which the citation page and CITATION.cff state.
+ORCID = "0000-0002-1316-3170"
 #: The number of Python blocks of each page that ``test_page_code_runs`` runs.
-CODE_BLOCKS = {"usage.qmd": 5, "gradients.qmd": 2}
+CODE_BLOCKS = {"index.qmd": 5, "gradients.qmd": 2}
 
 
 def _load_check_site():
@@ -211,7 +216,7 @@ def test_reference_lists_every_public_name():
 
 
 def test_pages_need_no_notes():
-    """No page names the working notes or the CODE-A copy as a place to read."""
+    """No page names the working notes, the legacy Fortran code or a removed page."""
     for name in PAGES:
         text = _page(name)
         for word in FORBIDDEN:
@@ -306,7 +311,7 @@ def test_page_code_runs(page, tmp_path, monkeypatch):
     ns: dict = {}
     for b in blocks:
         exec(compile(b, page, "exec"), ns)
-    if page == "usage.qmd":
+    if page == "index.qmd":
         results = [ns["F"].geoid, ns["grid"], ns["Z"], ns["misfit"], ns["back"]]
     else:
         results = [ns["value"], ns["gradient"]]
@@ -328,28 +333,6 @@ def _pade_backward_bound(order: int, x: float) -> float:
         return float(abs(mp.log(mp.exp(-xm) * num / den)) / xm)
 
 
-def _lovejx_case_count() -> int:
-    """The number of test cases that call lovejx, from the test files with ``ast``: every
-    function of ``tests/test_sh.py`` with an argument ``sht`` and
-    ``tests/test_reference_oracle.py::test_g19_gravity_against_lovejx``, each counted by
-    the length of its ``parametrize`` list."""
-    def cases(fn) -> int:
-        n = 1
-        for d in fn.decorator_list:
-            if isinstance(d, ast.Call) and getattr(d.func, "attr", "") == "parametrize":
-                n *= len(ast.literal_eval(d.args[1]))
-        return n
-    total = 0
-    for node in ast.parse((TESTS / "test_sh.py").read_text()).body:
-        if isinstance(node, ast.FunctionDef) and node.name.startswith("test_") and \
-                any(a.arg == "sht" for a in node.args.args):
-            total += cases(node)
-    for node in ast.parse((TESTS / "test_reference_oracle.py").read_text()).body:
-        if isinstance(node, ast.FunctionDef) and node.name == "test_g19_gravity_against_lovejx":
-            total += cases(node)
-    return total
-
-
 def _fmt(x: float) -> str:
     """A tolerance as the pages write it, ``1e-12``."""
     return f"{x:.0e}".replace("e-0", "e-")
@@ -360,8 +343,7 @@ def test_page_numbers_match_code():
     pattern built from the code value."""
     import taylor
     grad, val, phys = _page("gradients.qmd"), _page("validation.qmd"), _page("physics.qmd")
-    install, usage = _page("install.qmd"), _page("usage.qmd")
-    readme = (REPO / "README.md").read_text()
+    home = _page("index.qmd")
     flat = lambda t: " ".join(t.split())
     # The clamp margin of a movable range.
     assert f"{100 * sj.controls.CLAMP_FRACTION:g} %" in flat(grad)
@@ -383,13 +365,11 @@ def test_page_numbers_match_code():
     assert f"`{_fmt(_constant(TESTS / 'test_kernels_ad.py', 'DOT_RTOL_CONTRAST'))}`" in grad
     # The default method of a movable boundary.
     motion = inspect.signature(sj.controls.Layers).parameters["motion"].default
-    for text in (grad, usage):
+    for text in (grad, home):
         assert f'`motion="{motion}"`, the default of `Layers`' in flat(text)
     # The bounds of the references.
     sections = re.split(r"\n## ", val)
     sect = {s.split("\n", 1)[0]: s for s in sections}
-    fortran = _fmt(_constant(TESTS / "test_kernels_legacy.py", "FORTRAN_TOL"))
-    assert f"`{fortran}`" in sect["Fortran CODE-A"]
     for name in ("ORACLE_TOL", "CONTRAST_TOL"):
         assert f"`{_fmt(_constant(TESTS / 'test_kernels_oracle.py', name))}`" in sect["The mpmath reference"]
     assert f"Bound `{_fmt(_constant(TESTS / 'test_assess.py', 'ASSESS_TOL'))}`" in sect["Analytical solutions"]
@@ -400,25 +380,22 @@ def test_page_numbers_match_code():
     assert f"bound {_pade_backward_bound(6, theta[6]):.1e}" in flat(phys)
     for m in (7, 9):
         assert abs(_pade_backward_bound(m, theta[m]) / 2.0 ** -53 - 1.0) < 0.01, m
-    # The test count and time of the one run: equal on README and the install page.
-    run = re.compile(r"(\d+) tests pass in (\d+(?:\.\d+)?) s")
-    assert run.findall(flat(readme)) and run.findall(flat(readme)) == run.findall(flat(install))
-    # The CI skip count and the count of the lovejx tests: equal on the three texts.
-    lovejx = _lovejx_case_count()
-    assert lovejx == 13
-    skips = re.compile(r"skips (\d+) tests")
-    for text in (readme, install, val):
-        assert skips.findall(flat(text)) == skips.findall(flat(readme)) != [], text[:40]
-        assert f"{lovejx} tests that compare with lovejx" in flat(text)
 
 
-def test_open_points_and_readme_links():
-    """The open-points page states that the comparisons against published values come
-    later; the README links the site and its agentic-coding page."""
-    assert "comparisons against published values comes later" in " ".join(_page("open-points.qmd").split())
+def test_readme_links_and_citation():
+    """The README links the site and its agentic-coding page and does not name the legacy
+    Fortran code. ``CITATION.cff``, the citation page and ``stokesjx.__version__`` state
+    one version, and the citation page and ``CITATION.cff`` name the author's ORCID."""
     readme = (REPO / "README.md").read_text()
     assert "https://gadopt.org/stokesjx/" in readme
     assert "https://gadopt.org/stokesjx/agentic-coding.html" in readme
+    assert "CODE-A" not in readme
+    cff = yaml.safe_load((REPO / "CITATION.cff").read_text())
+    assert str(cff["version"]) == sj.__version__
+    assert cff["authors"][0]["orcid"].endswith(ORCID)
+    page = _page("citation.qmd")
+    assert f"Version {sj.__version__}." in page and f"version = {{{sj.__version__}}}" in page
+    assert ORCID in page
 
 
 # --------------------------------------------------------------------------

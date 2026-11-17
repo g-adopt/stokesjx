@@ -1,0 +1,58 @@
+---
+title: "Citation"
+---
+
+If you use `stokesjx` in published work, cite the software and the papers of the method.
+The file `CITATION.cff` of the repository holds the same data, and GitHub shows it as
+"Cite this repository".
+
+## The software
+
+Ghelichkhan, S. (2026). *stokesjx: instantaneous viscous response of a spherically
+symmetric mantle to internal loads, in JAX, with derivatives*. Version 0.1.0.
+<https://github.com/g-adopt/stokesjx>
+
+```bibtex
+@software{ghelichkhan_stokesjx_2026,
+  author  = {Ghelichkhan, Sia},
+  title   = {stokesjx: instantaneous viscous response of a spherically symmetric
+             mantle to internal loads, in JAX, with derivatives},
+  year    = {2026},
+  version = {0.1.0},
+  url     = {https://github.com/g-adopt/stokesjx},
+  license = {Apache-2.0}
+}
+```
+
+Author: [Sia Ghelichkhan](https://sia-g.com), ORCID
+[0000-0002-1316-3170](https://orcid.org/0000-0002-1316-3170).
+
+## The method
+
+The kernels follow the propagator-matrix formulation of the instantaneous mantle flow
+problem:
+
+- Hager, B. H. and O'Connell, R. J. (1981). A simple global model of plate dynamics and
+  mantle convection. *Journal of Geophysical Research*, 86, 4843-4867.
+  <https://doi.org/10.1029/JB086iB06p04843>
+- Ricard, Y., Fleitout, L. and Froidevaux, C. (1984). Geoid heights and lithospheric
+  stresses for a dynamic Earth. *Annales Geophysicae*, 2, 267-286.
+- Richards, M. A. and Hager, B. H. (1984). Geoid anomalies in a dynamic Earth. *Journal
+  of Geophysical Research*, 89, 5987-6002.
+- Hager, B. H. and Clayton, R. W. (1989). Constraints on the structure of mantle
+  convection using seismic observations, flow models, and the geoid. In *Mantle
+  Convection: Plate Tectonics and Global Dynamics*, ed. W. R. Peltier, Gordon and Breach,
+  657-763.
+- Forte, A. M. and Peltier, W. R. (1991). Viscous flow models of global geophysical
+  observables: 1. Forward problems. *Journal of Geophysical Research*, 96, 20131-20159.
+- Corrieu, V., Thoraval, C. and Ricard, Y. (1995). Mantle dynamics and geoid Green
+  functions. *Geophysical Journal International*, 120, 516-523.
+
+## The benchmark
+
+The benchmark of the package is the set of analytical solutions of Kramer, Davies and
+Wilson ([validation](validation.qmd)):
+
+- Kramer, S. C., Davies, D. R. and Wilson, C. R. (2021). Analytical solutions for mantle
+  flow in cylindrical and spherical shells. *Geoscientific Model Development*, 14,
+  1899-1919. <https://doi.org/10.5194/gmd-14-1899-2021>

@@ -40,17 +40,17 @@ the three named conventions are:
     real ``(..., 2, L+1, L+1)`` (SHTOOLS ``cilm``):
     ``f = sum_lm (C_lm cos(m lambda) + S_lm sin(m lambda)) sqrt(2 - delta_m0) Pbar_lm``,
     the geodesy normalisation, in which every harmonic has the mean square 1 over the
-    sphere. The ``.sph`` density files of CODE-A hold this convention.
+    sphere. The legacy ``.sph`` density files hold this convention.
 ``"real_orthonormal"``
-    ``real_4pi`` times ``sqrt(4 pi)``: the harmonics of CODE-A (calc.f:94-115), whose
+    ``real_4pi`` times ``sqrt(4 pi)``: the harmonics of the legacy Fortran code (calc.f:94-115), whose
     square integrates to 1 over the sphere, and of its ``SPHCO`` output files.
 
 Conversions: ``U_l0 = C_l0`` and ``U_lm = (C_lm - i S_lm) / sqrt(2)`` for ``m > 0``;
 ``real_orthonormal = sqrt(4 pi) real_4pi`` with ``pi`` from ``Units``, so that
-``Units(legacy_constants=True)`` gives CODE-A's ``sqt = sqrt(4 float32(pi))``
+``Units(legacy_constants=True)`` gives the legacy ``sqt = sqrt(4 float32(pi))``
 (constants.h:14; equations.md section 12). The three conventions were checked against
 three independent evaluations (scipy ``lpmv`` with the phase removed, lovejx
-``evaluate``, CODE-A's orthonormal formula): 1.1e-15 to 4.8e-15 relative to the largest
+``evaluate``, the legacy orthonormal formula): 1.1e-15 to 4.8e-15 relative to the largest
 value at ``L`` of 12 and 50 (``tests/test_sh.py``).
 """
 
@@ -370,7 +370,7 @@ def convert(coefficients, source: str, target: str, *, units: Units | None = Non
     units
         Supplies ``pi`` of the factor ``sqrt(4 pi)`` between ``real_4pi`` and
         ``real_orthonormal``; default ``Units()``. ``Units(legacy_constants=True)`` gives
-        CODE-A's float32 ``pi`` (``sqt``).
+        the legacy float32 ``pi`` (``sqt``).
 
     Returns
     -------

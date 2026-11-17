@@ -1,5 +1,5 @@
 stokesjx
-Copyright 2026 Siavash Ghelichkhan.
+Copyright 2026 Sia Ghelichkhan.
 
 This product includes software derived from CODE-A, a Fortran propagator-matrix
 code for the instantaneous geoid and dynamic topography of a viscous mantle. The
@@ -16,7 +16,7 @@ method of CODE-A is described in:
 The Fortran itself, with its quad-precision LINPACK routines by John Burkardt
 (LGPL), is not distributed with this product.
 
-Parts of this product are ported from lovejx (Siavash Ghelichkhan, Jerry X.
+Parts of this product are ported from lovejx (Sia Ghelichkhan, Jerry X.
 Mitrovica, William Scott and Mark Hoggard; Apache License, Version 2.0): the
 layer parameterisation of the controls, the integration of gravity from the
 density profile, the pattern of the unit scales, the spherical-harmonic

@@ -1,0 +1,79 @@
+# Build the distributions of stokesjx and publish them to PyPI.
+#
+# A push of a tag "v<version>" starts the workflow. The build job checks that the tag
+# equals the version of the package (stokesjx/__init__.py) and of CITATION.cff, builds
+# the sdist and the wheel, and checks their metadata with twine. The publish job uploads
+# them to PyPI with trusted publishing (OpenID Connect), so the repository holds no PyPI
+# token. PyPI must list this repository, this workflow file and the environment "pypi"
+# as a trusted publisher of the project "stokesjx".
+#
+# A version number can be uploaded to PyPI only once. A failed upload after a
+# successful one needs a new version and a new tag.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build the distributions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: install the build tools
+        run: pip install build twine pyyaml
+      # The tag, the package version and CITATION.cff must name the same version.
+      # A manual run (workflow_dispatch) has no tag, and it checks only the package
+      # version against CITATION.cff.
+      - name: check the version
+        run: |
+          python - <<'EOF'
+          import ast, os, pathlib, sys, yaml
+          tree = ast.parse(pathlib.Path("stokesjx/__init__.py").read_text())
+          version = next(n.value.value for n in tree.body if isinstance(n, ast.Assign)
+                         and getattr(n.targets[0], "id", "") == "__version__")
+          cff = str(yaml.safe_load(pathlib.Path("CITATION.cff").read_text())["version"])
+          ref = os.environ.get("GITHUB_REF", "")
+          problems = []
+          if cff != version:
+              problems.append(f"CITATION.cff has {cff}, the package has {version}")
+          if ref.startswith("refs/tags/") and ref != f"refs/tags/v{version}":
+              problems.append(f"the tag {ref} is not v{version}")
+          if problems:
+              sys.exit("; ".join(problems))
+          print("version", version)
+          EOF
+      - name: build the sdist and the wheel
+        run: python -m build
+      - name: check the metadata
+        run: twine check --strict dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    name: publish to PyPI
+    # Only a tag publishes. A manual run stops after the build, as a dry run.
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/stokesjx/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

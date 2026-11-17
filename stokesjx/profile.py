@@ -418,8 +418,8 @@ class RadialProfile:
         node, read inside the differentiated function, so it follows ``rho0`` under
         ``jax.grad`` and after ``replace(rho0=...)``. A number is an input of its own.
         Physical reason for the field (CONVENTIONS 14): PREM has 1020 or 2600 kg/m^3
-        at the top node depending on its ocean layer, and CODE-A uses
-        ``bgrho = 4500 kg/m^3`` (F3).
+        at the top node depending on its ocean layer, and the default
+        ``Units.density_scale`` is ``bgrho = 4500 kg/m^3`` (F3).
     uniform_gravity
         Scalar, m/s^2, or ``None`` (default). The value of a uniform background gravity
         as a traced leaf, so that ``g0`` can be a control

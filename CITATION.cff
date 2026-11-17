@@ -1,0 +1,56 @@
+# The citation metadata of stokesjx (Citation File Format 1.2.0). GitHub shows it as
+# "Cite this repository", and docs/citation.qmd repeats it. The version must equal the
+# version of pyproject.toml, and tests/test_docs_site.py checks that.
+cff-version: 1.2.0
+message: "If you use stokesjx, please cite the software and the method papers below."
+title: "stokesjx"
+abstract: >-
+  Instantaneous viscous response of a spherically symmetric mantle to internal loads
+  (geoid, dynamic topography, surface velocity), in JAX, with derivatives.
+type: software
+authors:
+  - family-names: Ghelichkhan
+    given-names: Sia
+    orcid: "https://orcid.org/0000-0002-1316-3170"
+    website: "https://sia-g.com"
+version: 0.1.0
+license: Apache-2.0
+repository-code: "https://github.com/g-adopt/stokesjx"
+url: "https://gadopt.org/stokesjx/"
+keywords:
+  - geophysics
+  - geoid
+  - dynamic topography
+  - mantle flow
+  - propagator matrix
+  - JAX
+references:
+  - type: article
+    authors:
+      - family-names: Hager
+        given-names: Bradford H.
+      - family-names: O'Connell
+        given-names: Richard J.
+    title: "A simple global model of plate dynamics and mantle convection"
+    journal: "Journal of Geophysical Research: Solid Earth"
+    volume: 86
+    issue: B6
+    start: 4843
+    end: 4867
+    year: 1981
+    doi: 10.1029/JB086iB06p04843
+  - type: article
+    authors:
+      - family-names: Kramer
+        given-names: Stephan C.
+      - family-names: Davies
+        given-names: D. Rhodri
+      - family-names: Wilson
+        given-names: Cian R.
+    title: "Analytical solutions for mantle flow in cylindrical and spherical shells"
+    journal: "Geoscientific Model Development"
+    volume: 14
+    start: 1899
+    end: 1919
+    year: 2021
+    doi: 10.5194/gmd-14-1899-2021

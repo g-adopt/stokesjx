@@ -3,7 +3,7 @@ examples and the benchmark of stokesjx.
 
 The examples do not import from ``tests/``. This module therefore builds, in float64,
 the same table family as ``tests/cases.py::t_prem`` (the table of the chunk 4 and c4b
-measurements): the 129 equally spaced radii of CODE-A's density file
+measurements): the 129 equally spaced radii of the legacy density file
 ``LEBEDEV_S4RTS.sph`` between the core-mantle boundary (CMB) at 3480 km and the surface
 at 6370 km, with a duplicated node pair at 100, 220, 400 and 670 km depth. The reference
 density ``rho0`` is the PREM mantle (Dziewonski and Anderson 1981), so ``rho0`` jumps at
@@ -37,7 +37,7 @@ import stokesjx as sj
 # Geometry of the table.
 # ---------------------------------------------------------------------------
 
-#: The surface radius of every table, m: CODE-A's ``Rearth`` (6370 km, not the PREM
+#: The surface radius of every table, m: the legacy ``Rearth`` (6370 km, not the PREM
 #: value 6371 km). The depth of a node is ``R_SURFACE - r``.
 R_SURFACE = 6370e3
 #: The CMB radius, m.
@@ -48,7 +48,7 @@ LEBEDEV_RADII = np.linspace(R_CMB, R_SURFACE, 129)
 #: discontinuities); the 100 km pair carries a viscosity jump only.
 PAIR_DEPTHS_KM = (100, 220, 400, 670)
 
-#: The hager4 viscosity by depth (CODE-A's ``Hager_4Layer_Flip.visc``, the
+#: The hager4 viscosity by depth (the legacy file ``Hager_4Layer_Flip.visc``, the
 #: ``test_4_ishan`` profile): ``(depth of the bottom of the layer in m, viscosity in
 #: Pa s)``, from the surface down; the last layer has no bottom. 1e20 Pa s above 100 km,
 #: 1e19/30 Pa s (3.33e17) from 100 to 400 km, 1e19 Pa s from 400 to 670 km, 1e20 Pa s

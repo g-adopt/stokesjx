@@ -4,19 +4,19 @@ stokesjx computes, per spherical-harmonic degree ``l`` and per source radius, th
 response kernels of a viscous, self-gravitating, spherically symmetric mantle to a
 sheet of internal density anomaly: the geoid, the dynamic topography of the surface
 and of the core-mantle boundary (CMB), and the surface velocity. A field is the
-radial integral of a kernel times the density anomaly. The physics is that of CODE-A
-(Corrieu, Thoraval and Ricard 1995; Hager and Clayton 1989), with the errors of CODE-A
-fixed (NOTES/PLAN.md section 4).
+radial integral of a kernel times the density anomaly. The physics follows Corrieu,
+Thoraval and Ricard (1995) and Hager and Clayton (1989), with self-consistent gravity,
+trapezoid weights of the radial integral and degree 1 in the centre-of-mass frame.
 
 The method is a propagator method with two orthonormalised sweeps per degree: the
 exact interval exponentials of all degrees in one batched Pade call, an upward and a
 downward ``lax.scan`` of three-vector bases with Gram-Schmidt after every interval,
 the output rows carried through the triangular factors, and one batched 6x6 solve at
-every source node. It is stable in float64 at every degree, so it needs none of the
-128-bit reals of CODE-A.
+every source node. It is stable in float64 at every degree, so it needs no 128-bit
+reals, which a single product of the propagators of all intervals needs.
 
 Two layers, as in lovejx. The low layer (``stokesjx.propagate``) is the solver, with
-test-only switches that reproduce CODE-A. The high layer is the pure function
+test-only switches that reproduce the legacy discrete model. The high layer is the pure function
 ``stokes_kernels(profile, config)`` of a ``RadialProfile`` (a pytree of the arrays that
 a derivative can move) and a static ``StokesConfig``, valid under ``jax.jit``,
 ``jax.grad``, ``jax.vmap`` and ``jax.jvp``. The derivatives are for Hamiltonian Monte
@@ -33,11 +33,11 @@ Fields (``stokesjx.fields``): ``apply(kernels, density, profile)`` integrates th
 kernels against a density anomaly with the trapezoid weights of the node table in one
 einsum; ``gravity_anomaly`` and ``admittance`` are post-processing of the coefficients.
 Spherical harmonics (``stokesjx.sh``): three coefficient conventions (``complex_4pi`` of
-lovejx, ``real_4pi`` of SHTOOLS and of CODE-A's density files, ``real_orthonormal`` of
-CODE-A's output) with one layout rule for every coefficient array (the degree and order
+lovejx, ``real_4pi`` of SHTOOLS and of the ``.sph`` density files, ``real_orthonormal``
+of the ``SPHCO`` output files) with one layout rule for every coefficient array (the degree and order
 axes last, the ``C/S`` axis before them for a real convention), their conversions, a grid
-synthesis and the Gauss-Legendre transform of lovejx. CODE-A's file formats are read and
-written by ``stokesjx.io.legacy`` (imported on use).
+synthesis and the Gauss-Legendre transform of lovejx. The legacy file formats are read
+and written by ``stokesjx.io.legacy`` (imported on use).
 
 Controls (``stokesjx.controls``): ``Layers`` maps one log viscosity per layer and the
 radii of movable viscosity boundaries to a profile (by default the boundary is a
@@ -66,7 +66,7 @@ Public names (``__all__``):
   ``gravity_anomaly``, ``admittance``;
 - controls: ``Layers``, ``MovableRange`` (the static record of one movable boundary),
   ``viscosity_by_node`` and ``NodeViscosity`` (its map), ``ControlVector``;
-- modules: ``fields``, ``sh``, ``controls``. The module ``stokesjx.io.legacy`` (CODE-A's
+- modules: ``fields``, ``sh``, ``controls``. The module ``stokesjx.io.legacy`` (the legacy
   file formats, numpy only) is not imported by the package; import it on use.
 """
 
@@ -99,7 +99,7 @@ from . import controls  # noqa: E402
 from .controls import ControlVector, Layers, MovableRange, NodeViscosity, viscosity_by_node  # noqa: E402
 from .units import Units  # noqa: E402
 
-__version__ = "0.0.1.dev0"
+__version__ = "0.1.0"
 
 __all__ = [
     "BoundaryCondition", "DegreeOneFrame", "Formulation", "FreeSlip", "GravityModel", "Hydrostatic",

@@ -68,8 +68,8 @@ class Uniform:
     Parameters
     ----------
     value
-        ``g0`` in m/s^2, positive, or ``None`` (default). CODE-A uses 10 (``grav()``,
-        matrix.f:98); the G-ADOPT benchmark and ``assess`` use their own value. A number
+        ``g0`` in m/s^2, positive, or ``None`` (default). The legacy Fortran code uses 10
+        (``grav()``, matrix.f:98); the G-ADOPT benchmark and ``assess`` use their own value. A number
         is static: it is a field of the hashable config, and a new number compiles
         again. ``None`` means that the value is the profile leaf
         ``RadialProfile.uniform_gravity``, which can be traced, so that ``g0`` can be a
@@ -248,7 +248,7 @@ class DegreeOneFrame(Enum):
         at a relative offset of 1e-10), so float64 cannot solve it. The default is
         never raw for such a configuration.
     LEGACY_GEOID_ZERO
-        CODE-A's frame: the raw solve with the degree-1 geoid set to zero
+        The legacy frame: the raw solve with the degree-1 geoid set to zero
         (driver.f:282-284). Low layer only (``propagate.Discretisation``);
         ``StokesConfig`` refuses it.
     """

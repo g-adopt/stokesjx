@@ -17,9 +17,14 @@ def test_import_sets_x64():
 
 
 def test_version():
+    """The version is a plain release number ``X.Y.Z``. pyproject.toml reads it from
+    ``stokesjx.__version__``, and tests/test_docs_site.py checks that CITATION.cff and the
+    citation page state the same number."""
+    import re
+
     import stokesjx
 
-    assert stokesjx.__version__ == "0.0.1.dev0"
+    assert re.fullmatch(r"\d+\.\d+\.\d+", stokesjx.__version__), stokesjx.__version__
 
 
 def test_editable_install_points_at_this_checkout():
